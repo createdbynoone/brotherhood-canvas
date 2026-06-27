@@ -63,6 +63,13 @@
       "iconSize": 80
     },
     "directories": { "output": "release" },
-    "files": ["out/**/*"]
+    "files": ["out/**/*"],
+    "extraResources": [
+      {
+        "from": "build/icons",
+        "to": "icons",
+        "filter": ["**/*.png"]
+      }
+    ]
   }
 }

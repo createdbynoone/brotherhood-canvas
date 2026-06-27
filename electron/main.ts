@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, protocol, dialog, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, protocol, dialog, shell, nativeImage, Menu } from 'electron'
 import { join } from 'path'
 import {
   readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync,
@@ -13,6 +13,80 @@ import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
 const execAsync = promisify(exec)
+
+// ─── Icon styles ──────────────────────────────────────────────────────────────
+const ICON_STYLES = ['Default', 'Dark', 'ClearLight', 'ClearDark', 'TintedLight', 'TintedDark'] as const
+type IconStyle = typeof ICON_STYLES[number]
+
+function getIconPath(style: string): string {
+  const file = `Icon-macOS-${style}-1024@1x.png`
+  if (app.isPackaged) return join(process.resourcesPath, 'icons', file)
+  return join(__dirname, '../../build/icons', file)
+}
+
+function applyDockIcon(style: string): void {
+  if (process.platform !== 'darwin') return
+  try {
+    const icon = nativeImage.createFromPath(getIconPath(style))
+    if (!icon.isEmpty()) app.dock.setIcon(icon)
+  } catch { /* ignore */ }
+}
+
+function buildAppMenu(): void {
+  const prefs = loadPrefs()
+  const iconSubmenu: Electron.MenuItemConstructorOptions[] = ICON_STYLES.map(style => ({
+    label: style,
+    type: 'radio' as const,
+    checked: (prefs.iconStyle as string) === style,
+    click: () => {
+      savePrefs({ ...loadPrefs(), iconStyle: style as IconStyle })
+      applyDockIcon(style)
+      buildAppMenu()
+    },
+  }))
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: app.getName(),
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { label: 'App Icon', submenu: iconSubmenu },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+      ],
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        { type: 'separator' },
+        { role: 'front' },
+      ],
+    },
+  ]
+
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const PREFS_FILE    = 'canvas-prefs.json'
@@ -54,6 +128,7 @@ let vaultPath: string | null = null
 interface Prefs {
   vaultPath: string | null
   lastBoardId: string | null
+  iconStyle?: IconStyle
   windowBounds?: { x: number; y: number; width: number; height: number }
 }
 
@@ -235,10 +310,11 @@ function createWindow(): void {
 
   mainWindow.webContents.on('will-navigate', e => e.preventDefault())
 
-  if (app.isPackaged) {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  if (process.env.ELECTRON_RENDERER_URL) {
+    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
+    mainWindow.webContents.openDevTools({ mode: 'detach' })
   } else {
-    mainWindow.loadURL('http://localhost:5173')
+    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
 
@@ -265,6 +341,8 @@ app.whenReady().then(() => {
     }
   })
 
+  buildAppMenu()
+  applyDockIcon(loadPrefs().iconStyle ?? 'Default')
   createWindow()
 
   // Auto-update setup
