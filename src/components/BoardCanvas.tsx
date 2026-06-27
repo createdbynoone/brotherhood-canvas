@@ -18,6 +18,7 @@ import VideoNode from './nodes/VideoNode'
 import PDFNode from './nodes/PDFNode'
 import TextNode from './nodes/TextNode'
 import NoteNode from './nodes/NoteNode'
+import TitleNode from './nodes/TitleNode'
 
 // ─── Node type registry ───────────────────────────────────────────────────────
 const NODE_TYPES = {
@@ -26,6 +27,7 @@ const NODE_TYPES = {
   pdf: PDFNode,
   text: TextNode,
   note: NoteNode,
+  title: TitleNode,
 }
 
 const DEFAULT_SIZES: Record<string, [number, number]> = {
@@ -125,22 +127,6 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
     onMetaChange(boardId, nodes.length)
   }, [nodes, edges, background, isLoading])
 
-  // ─── Keyboard shortcuts ──────────────────────────────────────────────────────
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const tag = (e.target as HTMLElement)?.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
-      if (e.key === 'v' || e.key === 'V') setTool('select')
-      if (e.key === 'h' || e.key === 'H') setTool('pan')
-      if (e.key === 'f' || e.key === 'F') fitView({ padding: 0.2, duration: 300 })
-      if ((e.key === '+' || e.key === '=') && !e.metaKey && !e.ctrlKey) zoomIn({ duration: 200 })
-      if (e.key === '-' && !e.metaKey && !e.ctrlKey) zoomOut({ duration: 200 })
-      if (e.key === 'Escape') { setContextMenu(null); setStylePanelId(null) }
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [fitView, zoomIn, zoomOut])
-
   // ─── Connections ─────────────────────────────────────────────────────────────
   const onConnect = useCallback((params: Connection) => {
     setEdges(es => addEdge(params, es))
@@ -186,6 +172,11 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
   }, [])
 
   // ─── Add nodes from toolbar ──────────────────────────────────────────────────
+  const addTitle = useCallback(() => {
+    const pos = screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
+    setNodes(ns => [...ns, { id: crypto.randomUUID(), type: 'title', position: { x: pos.x - 200, y: pos.y - 40 }, data: { content: '', fontSize: 32 }, width: 400, height: 80 }])
+  }, [screenToFlowPosition])
+
   const addNote = useCallback(() => {
     const pos = screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
     setNodes(ns => [...ns, { id: crypto.randomUUID(), type: 'note', position: pos, data: { content: '', noteColor: '#E8B547' }, width: 220, height: 180 }])
@@ -195,6 +186,23 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
     const pos = screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
     setNodes(ns => [...ns, { id: crypto.randomUUID(), type: 'text', position: pos, data: { content: '' }, width: 260, height: 180 }])
   }, [screenToFlowPosition])
+
+  // ─── Keyboard shortcuts ──────────────────────────────────────────────────────
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+      if (e.key === 'v' || e.key === 'V') setTool('select')
+      if (e.key === 'h' || e.key === 'H') setTool('pan')
+      if (e.key === 't' || e.key === 'T') addTitle()
+      if (e.key === 'f' || e.key === 'F') fitView({ padding: 0.2, duration: 300 })
+      if ((e.key === '+' || e.key === '=') && !e.metaKey && !e.ctrlKey) zoomIn({ duration: 200 })
+      if (e.key === '-' && !e.metaKey && !e.ctrlKey) zoomOut({ duration: 200 })
+      if (e.key === 'Escape') { setContextMenu(null); setStylePanelId(null) }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [fitView, zoomIn, zoomOut, addTitle])
 
   // ─── Drag and drop ───────────────────────────────────────────────────────────
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -253,7 +261,7 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
       <Toolbar
         tool={tool} background={background}
         onToolChange={setTool} onBackgroundChange={setBackground}
-        onAddNote={addNote} onAddText={addText}
+        onAddTitle={addTitle} onAddNote={addNote} onAddText={addText}
         zoom={zoom}
         onZoomIn={() => zoomIn({ duration: 200 })}
         onZoomOut={() => zoomOut({ duration: 200 })}
@@ -287,6 +295,7 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
         deleteKeyCode={['Delete', 'Backspace']}
         multiSelectionKeyCode="Shift"
         defaultEdgeOptions={{ style: { stroke: '#3a3a3a', strokeWidth: 1.5 } }}
+        connectionLineStyle={{ stroke: '#E8B547', strokeWidth: 2, strokeDasharray: '6 3' }}
         proOptions={{ hideAttribution: true }}
       >
         {bgVariant && <Background variant={bgVariant} color="#1e1e1e" gap={20} size={1.5} />}

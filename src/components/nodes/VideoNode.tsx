@@ -37,7 +37,12 @@ function VideoNode({ data, selected, width, height }: NodeProps & { data: MediaN
       <Handle type="target" position={Position.Bottom} id="t-bottom" style={{ left: '30%', bottom: -5 }} />
 
       {/* Video */}
-      <div className="relative flex-1 overflow-hidden bg-black">
+      <div
+        className="relative flex-1 overflow-hidden bg-black"
+        onDoubleClick={() => window.dispatchEvent(new CustomEvent('canvas:preview', {
+          detail: { url, type: 'video', fileName: data.fileName }
+        }))}
+      >
         <video
           ref={videoRef}
           src={url}
@@ -48,7 +53,8 @@ function VideoNode({ data, selected, width, height }: NodeProps & { data: MediaN
         {/* Play overlay */}
         {!playing && (
           <button
-            onClick={togglePlay}
+            onClick={e => { e.stopPropagation(); togglePlay(e) }}
+            onDoubleClick={e => e.stopPropagation()}
             className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/20 transition-colors group nodrag nopan"
           >
             <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/30 transition-colors">
@@ -61,7 +67,8 @@ function VideoNode({ data, selected, width, height }: NodeProps & { data: MediaN
         {/* Pause — click anywhere on playing video */}
         {playing && (
           <button
-            onClick={togglePlay}
+            onClick={e => { e.stopPropagation(); togglePlay(e) }}
+            onDoubleClick={e => e.stopPropagation()}
             className="absolute inset-0 nodrag nopan opacity-0"
             aria-label="Pause"
           />

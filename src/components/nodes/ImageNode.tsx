@@ -46,9 +46,11 @@ function ImageNode({ data, selected, width, height }: NodeProps & { data: MediaN
             src={url}
             alt={data.fileName}
             onError={() => setImgError(true)}
-            onDoubleClick={() => window.canvas.files.openExternal(data.filePath)}
+            onDoubleClick={() => window.dispatchEvent(new CustomEvent('canvas:preview', {
+              detail: { url, type: 'image', fileName: data.fileName }
+            }))}
             draggable={false}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover cursor-zoom-in"
           />
         )}
       </div>

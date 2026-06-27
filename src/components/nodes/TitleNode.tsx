@@ -1,0 +1,102 @@
+import { memo, useState, useRef, useEffect, useCallback } from 'react'
+import { Handle, Position, NodeResizer, useReactFlow, type NodeProps } from '@xyflow/react'
+import type { TitleNodeData } from '../../types'
+
+const SIZE_PRESETS = [
+  { label: 'H1', size: 40 },
+  { label: 'H2', size: 28 },
+  { label: 'H3', size: 20 },
+]
+
+function TitleNode({ data, selected, width, height, id }: NodeProps & { data: TitleNodeData; width?: number; height?: number }) {
+  const { updateNodeData } = useReactFlow()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft]     = useState(data.content ?? '')
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const fontSize = data.fontSize ?? 32
+
+  useEffect(() => { if (!editing) setDraft(data.content ?? '') }, [data.content, editing])
+  useEffect(() => { if (editing) { inputRef.current?.focus(); inputRef.current?.select() } }, [editing])
+
+  const commit = useCallback(() => {
+    setEditing(false)
+    updateNodeData(id, { content: draft })
+  }, [id, draft, updateNodeData])
+
+  const setSize = useCallback((size: number) => {
+    updateNodeData(id, { fontSize: size })
+  }, [id, updateNodeData])
+
+  return (
+    <div
+      className="relative flex flex-col items-center justify-center"
+      style={{
+        width:  width  ?? 400,
+        height: height ?? 80,
+        background: 'transparent',
+        border: selected ? '1.5px dashed rgba(232,181,71,0.4)' : '1.5px dashed transparent',
+        borderRadius: 6,
+      }}
+      onDoubleClick={() => !editing && setEditing(true)}
+    >
+      <NodeResizer minWidth={120} minHeight={36} isVisible={selected} />
+
+      <Handle type="source" position={Position.Top}    id="s-top"    style={{ left: '50%', top: -5 }} />
+      <Handle type="source" position={Position.Right}  id="s-right"  style={{ right: -5, top: '50%' }} />
+      <Handle type="source" position={Position.Bottom} id="s-bottom" style={{ left: '50%', bottom: -5 }} />
+      <Handle type="source" position={Position.Left}   id="s-left"   style={{ left: -5, top: '50%' }} />
+      <Handle type="target" position={Position.Top}    id="t-top"    style={{ left: '30%', top: -5 }} />
+      <Handle type="target" position={Position.Bottom} id="t-bottom" style={{ left: '30%', bottom: -5 }} />
+
+      {/* Size picker — shown when selected and not editing */}
+      {selected && !editing && (
+        <div
+          className="absolute -top-8 left-1/2 -translate-x-1/2 flex items-center gap-0.5 bg-surface border border-border rounded-lg px-1 py-0.5 z-20 nodrag nopan"
+          onMouseDown={e => e.stopPropagation()}
+        >
+          {SIZE_PRESETS.map(({ label, size }) => (
+            <button
+              key={label}
+              onClick={e => { e.stopPropagation(); setSize(size) }}
+              className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-colors ${
+                fontSize === size ? 'bg-accent/20 text-accent' : 'text-text-muted hover:text-text-primary'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {editing ? (
+        <textarea
+          ref={inputRef}
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={e => {
+            e.stopPropagation()
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); commit() }
+            if (e.key === 'Escape') commit()
+          }}
+          style={{ fontSize, lineHeight: 1.15 }}
+          className="nodrag nopan nowheel w-full h-full resize-none bg-transparent text-center font-bold text-text-primary outline-none px-2"
+          spellCheck={false}
+        />
+      ) : (
+        <div
+          style={{ fontSize, lineHeight: 1.15 }}
+          className="w-full h-full flex items-center justify-center text-center font-bold text-text-primary px-2 cursor-text leading-tight overflow-hidden"
+        >
+          {data.content || (
+            <span className="text-text-muted/30 font-normal" style={{ fontSize: Math.min(fontSize * 0.6, 16) }}>
+              Double-click to add title…
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default memo(TitleNode)

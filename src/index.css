@@ -21,26 +21,35 @@ html, body, #root {
   background: #0c0c0c;
 }
 
-/* Connection handles — tiny dots, visible on node hover/select */
+/* Connection handles — Miro/FigJam style, appear on node hover */
 .react-flow__handle {
-  width: 10px;
-  height: 10px;
-  background: #E8B547;
-  border: 2px solid #0c0c0c;
+  width: 16px;
+  height: 16px;
+  background: #1a1a1a;
+  border: 2px solid #E8B547;
   border-radius: 50%;
   opacity: 0;
-  transition: opacity 0.15s, transform 0.15s;
+  transition: opacity 0.12s, transform 0.12s, background 0.12s;
   z-index: 10;
+  cursor: crosshair;
 }
 .react-flow__node:hover .react-flow__handle,
 .react-flow__node.selected .react-flow__handle {
   opacity: 1;
 }
 .react-flow__handle:hover {
-  transform: scale(1.4);
+  transform: scale(1.35);
+  background: #E8B547;
 }
 .react-flow__handle-connecting {
   opacity: 1 !important;
+  background: #E8B547 !important;
+}
+/* Connection line while dragging */
+.react-flow__connectionline {
+  stroke: #E8B547;
+  stroke-width: 2;
+  stroke-dasharray: 6 3;
 }
 
 /* Selection box */

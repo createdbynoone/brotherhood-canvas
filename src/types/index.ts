@@ -30,7 +30,12 @@ export interface NoteNodeData extends BaseNodeData {
   noteColor?: string
 }
 
-export type AnyNodeData = MediaNodeData | TextNodeData | NoteNodeData
+export interface TitleNodeData extends BaseNodeData {
+  content: string
+  fontSize?: number
+}
+
+export type AnyNodeData = MediaNodeData | TextNodeData | NoteNodeData | TitleNodeData
 
 // ─── Board serialization ──────────────────────────────────────────────────────
 export interface BoardMeta {

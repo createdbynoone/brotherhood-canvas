@@ -7,6 +7,7 @@ interface Props {
   background: BackgroundType
   onToolChange: (t: Tool) => void
   onBackgroundChange: (b: BackgroundType) => void
+  onAddTitle: () => void
   onAddNote: () => void
   onAddText: () => void
   zoom: number
@@ -24,7 +25,7 @@ const BG_OPTIONS: { value: BackgroundType; label: string }[] = [
 
 export default function Toolbar({
   tool, background, onToolChange, onBackgroundChange,
-  onAddNote, onAddText, zoom, onZoomIn, onZoomOut, onZoomFit,
+  onAddTitle, onAddNote, onAddText, zoom, onZoomIn, onZoomOut, onZoomFit,
 }: Props) {
   return (
     <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 flex items-center gap-0.5 bg-surface border border-border rounded-xl px-2 py-1.5 shadow-xl no-drag">
@@ -52,6 +53,13 @@ export default function Toolbar({
       </ToolBtn>
 
       <Divider />
+
+      {/* Add Title */}
+      <ToolBtn onClick={onAddTitle} title="Add Title (T)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M4 6h16M12 6v13M8 19h8" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </ToolBtn>
 
       {/* Add Note */}
       <ToolBtn onClick={onAddNote} title="Add Note">

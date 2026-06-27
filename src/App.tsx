@@ -5,12 +5,22 @@ import Sidebar from './components/Sidebar'
 import BoardCanvas from './components/BoardCanvas'
 import TitleBar from './components/TitleBar'
 import UpdateBar from './components/UpdateBar'
+import MediaLightbox, { type LightboxState } from './components/MediaLightbox'
 
 export default function App() {
   const [screen, setScreen]     = useState<AppScreen>('loading')
   const [vault, setVault]       = useState<VaultState | null>(null)
   const [boards, setBoards]     = useState<BoardMeta[]>([])
   const [activeBoardId, setActiveBoardId] = useState<string | null>(null)
+  const [lightbox, setLightbox] = useState<LightboxState | null>(null)
+
+  useEffect(() => {
+    function onPreview(e: Event) {
+      setLightbox((e as CustomEvent<LightboxState>).detail)
+    }
+    window.addEventListener('canvas:preview', onPreview)
+    return () => window.removeEventListener('canvas:preview', onPreview)
+  }, [])
 
   // On mount: check if vault is already configured
   useEffect(() => {
@@ -86,6 +96,8 @@ export default function App() {
   }
 
   return (
+    <>
+    <MediaLightbox state={lightbox} onClose={() => setLightbox(null)} />
     <div className="w-full h-full flex flex-col">
       <TitleBar
         vaultName={vault?.name ?? 'Brotherhood Canvas'}
@@ -127,5 +139,6 @@ export default function App() {
         </div>
       </div>
     </div>
+    </>
   )
 }
