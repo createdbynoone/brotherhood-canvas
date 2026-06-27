@@ -1,6 +1,7 @@
 import { memo, useState, useRef, useEffect, useCallback } from 'react'
-import { Handle, Position, NodeResizer, useReactFlow, type NodeProps } from '@xyflow/react'
+import { useReactFlow, type NodeProps } from '@xyflow/react'
 import type { NoteNodeData } from '../../types'
+import NodeShell from './NodeShell'
 
 function NoteNode({ data, selected, width, height, id }: NodeProps & { data: NoteNodeData; width?: number; height?: number }) {
   const { updateNodeData } = useReactFlow()
@@ -17,32 +18,22 @@ function NoteNode({ data, selected, width, height, id }: NodeProps & { data: Not
     updateNodeData(id, { content: draft })
   }, [id, draft, updateNodeData])
 
-  const bgColor = noteColor + '12'    // 7% opacity
-  const bdColor = noteColor + '38'    // 22% opacity
+  const bgColor = noteColor + '12'
+  const bdColor = noteColor + '38'
 
-  const style: React.CSSProperties = {
+  const innerStyle: React.CSSProperties = {
     background:   data.nodeStyle?.backgroundColor ?? bgColor,
     borderColor:  data.nodeStyle?.borderColor ?? (selected ? noteColor : bdColor),
     borderWidth:  data.nodeStyle?.borderWidth ?? 1,
     borderStyle:  'solid',
     borderRadius: data.nodeStyle?.borderRadius ?? 10,
     opacity:      data.nodeStyle?.opacity ?? 1,
-    width:  width  ?? 220,
-    height: height ?? 180,
   }
 
   return (
-    <div className="relative flex flex-col overflow-hidden" style={style}>
-      <NodeResizer minWidth={140} minHeight={100} isVisible={selected} />
+    <NodeShell id={id} selected={selected} width={width ?? 220} height={height ?? 180}
+      minWidth={140} minHeight={100} innerStyle={innerStyle} innerClassName="flex flex-col">
 
-      <Handle type="source" position={Position.Top}    id="s-top"    style={{ left: '50%', top: -5 }} />
-      <Handle type="source" position={Position.Right}  id="s-right"  style={{ right: -5, top: '50%' }} />
-      <Handle type="source" position={Position.Bottom} id="s-bottom" style={{ left: '50%', bottom: -5 }} />
-      <Handle type="source" position={Position.Left}   id="s-left"   style={{ left: -5, top: '50%' }} />
-      <Handle type="target" position={Position.Top}    id="t-top"    style={{ left: '30%', top: -5 }} />
-      <Handle type="target" position={Position.Bottom} id="t-bottom" style={{ left: '30%', bottom: -5 }} />
-
-      {/* Color accent strip at top */}
       <div className="flex-shrink-0 h-[3px] rounded-t-[9px]" style={{ background: noteColor }} />
 
       {data.label && (
@@ -73,7 +64,7 @@ function NoteNode({ data, selected, width, height, id }: NodeProps & { data: Not
           </div>
         )}
       </div>
-    </div>
+    </NodeShell>
   )
 }
 

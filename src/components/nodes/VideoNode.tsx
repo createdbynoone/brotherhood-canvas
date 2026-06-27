@@ -1,21 +1,20 @@
 import { memo, useRef, useState } from 'react'
-import { Handle, Position, NodeResizer, type NodeProps } from '@xyflow/react'
+import { type NodeProps } from '@xyflow/react'
 import type { MediaNodeData } from '../../types'
+import NodeShell from './NodeShell'
 
-function VideoNode({ data, selected, width, height }: NodeProps & { data: MediaNodeData; width?: number; height?: number }) {
+function VideoNode({ data, selected, width, height, id }: NodeProps & { data: MediaNodeData; width?: number; height?: number }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [playing, setPlaying] = useState(false)
   const url = window.canvas.files.localUrl(data.filePath)
 
-  const style: React.CSSProperties = {
-    background: data.nodeStyle?.backgroundColor ?? '#0c0c0c',
-    borderColor: data.nodeStyle?.borderColor ?? (selected ? '#E8B547' : '#242424'),
-    borderWidth: data.nodeStyle?.borderWidth ?? 1,
-    borderStyle: 'solid',
+  const innerStyle: React.CSSProperties = {
+    background:   data.nodeStyle?.backgroundColor ?? '#0c0c0c',
+    borderColor:  data.nodeStyle?.borderColor ?? (selected ? '#E8B547' : '#242424'),
+    borderWidth:  data.nodeStyle?.borderWidth ?? 1,
+    borderStyle:  'solid',
     borderRadius: data.nodeStyle?.borderRadius ?? 8,
-    opacity: data.nodeStyle?.opacity ?? 1,
-    width: width ?? 280,
-    height: height ?? 200,
+    opacity:      data.nodeStyle?.opacity ?? 1,
   }
 
   function togglePlay(e: React.MouseEvent) {
@@ -26,17 +25,9 @@ function VideoNode({ data, selected, width, height }: NodeProps & { data: MediaN
   }
 
   return (
-    <div className="relative flex flex-col overflow-hidden" style={style}>
-      <NodeResizer minWidth={160} minHeight={120} isVisible={selected} />
+    <NodeShell id={id} selected={selected} width={width ?? 280} height={height ?? 200}
+      minWidth={160} minHeight={120} innerStyle={innerStyle} innerClassName="flex flex-col">
 
-      <Handle type="source" position={Position.Top}    id="top"    style={{ left: '50%', top: -5 }} />
-      <Handle type="source" position={Position.Right}  id="right"  style={{ right: -5, top: '50%' }} />
-      <Handle type="source" position={Position.Bottom} id="bottom" style={{ left: '50%', bottom: -5 }} />
-      <Handle type="source" position={Position.Left}   id="left"   style={{ left: -5, top: '50%' }} />
-      <Handle type="target" position={Position.Top}    id="t-top"  style={{ left: '30%', top: -5 }} />
-      <Handle type="target" position={Position.Bottom} id="t-bottom" style={{ left: '30%', bottom: -5 }} />
-
-      {/* Video */}
       <div
         className="relative flex-1 overflow-hidden bg-black"
         onDoubleClick={() => window.dispatchEvent(new CustomEvent('canvas:preview', {
@@ -50,7 +41,6 @@ function VideoNode({ data, selected, width, height }: NodeProps & { data: MediaN
           onEnded={() => setPlaying(false)}
           draggable={false}
         />
-        {/* Play overlay */}
         {!playing && (
           <button
             onClick={e => { e.stopPropagation(); togglePlay(e) }}
@@ -64,7 +54,6 @@ function VideoNode({ data, selected, width, height }: NodeProps & { data: MediaN
             </div>
           </button>
         )}
-        {/* Pause — click anywhere on playing video */}
         {playing && (
           <button
             onClick={e => { e.stopPropagation(); togglePlay(e) }}
@@ -80,7 +69,7 @@ function VideoNode({ data, selected, width, height }: NodeProps & { data: MediaN
           {data.label}
         </div>
       )}
-    </div>
+    </NodeShell>
   )
 }
 

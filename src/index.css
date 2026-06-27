@@ -21,10 +21,10 @@ html, body, #root {
   background: #0c0c0c;
 }
 
-/* Connection handles — Miro/FigJam style, appear on node hover */
+/* Connection handles — 4 per node, one centered on each edge */
 .react-flow__handle {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   background: #1a1a1a;
   border: 2px solid #E8B547;
   border-radius: 50%;
@@ -32,18 +32,24 @@ html, body, #root {
   transition: opacity 0.12s, transform 0.12s, background 0.12s;
   z-index: 10;
   cursor: crosshair;
+  /* React Flow centers handles on the edge by default */
 }
 .react-flow__node:hover .react-flow__handle,
 .react-flow__node.selected .react-flow__handle {
   opacity: 1;
 }
 .react-flow__handle:hover {
-  transform: scale(1.35);
+  transform: scale(1.4);
   background: #E8B547;
 }
 .react-flow__handle-connecting {
   opacity: 1 !important;
   background: #E8B547 !important;
+}
+
+/* Scissors — visible on node hover */
+.react-flow__node:hover .node-scissors {
+  opacity: 1;
 }
 /* Connection line while dragging */
 .react-flow__connectionline {

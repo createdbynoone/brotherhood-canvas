@@ -1,6 +1,7 @@
 import { memo } from 'react'
-import { Handle, Position, NodeResizer, type NodeProps } from '@xyflow/react'
+import { type NodeProps } from '@xyflow/react'
 import type { MediaNodeData } from '../../types'
+import NodeShell from './NodeShell'
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
@@ -8,35 +9,24 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-function PDFNode({ data, selected, width, height }: NodeProps & { data: MediaNodeData; width?: number; height?: number }) {
-  const style: React.CSSProperties = {
-    background: data.nodeStyle?.backgroundColor ?? '#141414',
-    borderColor: data.nodeStyle?.borderColor ?? (selected ? '#E8B547' : '#242424'),
-    borderWidth: data.nodeStyle?.borderWidth ?? 1,
-    borderStyle: 'solid',
+function PDFNode({ data, selected, width, height, id }: NodeProps & { data: MediaNodeData; width?: number; height?: number }) {
+  const innerStyle: React.CSSProperties = {
+    background:   data.nodeStyle?.backgroundColor ?? '#141414',
+    borderColor:  data.nodeStyle?.borderColor ?? (selected ? '#E8B547' : '#242424'),
+    borderWidth:  data.nodeStyle?.borderWidth ?? 1,
+    borderStyle:  'solid',
     borderRadius: data.nodeStyle?.borderRadius ?? 8,
-    opacity: data.nodeStyle?.opacity ?? 1,
-    width: width ?? 200,
-    height: height ?? 220,
+    opacity:      data.nodeStyle?.opacity ?? 1,
   }
 
   return (
-    <div className="relative flex flex-col overflow-hidden" style={style}>
-      <NodeResizer minWidth={140} minHeight={160} isVisible={selected} />
+    <NodeShell id={id} selected={selected} width={width ?? 200} height={height ?? 220}
+      minWidth={140} minHeight={160} innerStyle={innerStyle} innerClassName="flex flex-col">
 
-      <Handle type="source" position={Position.Top}    id="top"    style={{ left: '50%', top: -5 }} />
-      <Handle type="source" position={Position.Right}  id="right"  style={{ right: -5, top: '50%' }} />
-      <Handle type="source" position={Position.Bottom} id="bottom" style={{ left: '50%', bottom: -5 }} />
-      <Handle type="source" position={Position.Left}   id="left"   style={{ left: -5, top: '50%' }} />
-      <Handle type="target" position={Position.Top}    id="t-top"  style={{ left: '30%', top: -5 }} />
-      <Handle type="target" position={Position.Bottom} id="t-bottom" style={{ left: '30%', bottom: -5 }} />
-
-      {/* PDF preview card */}
       <div
         className="flex-1 flex flex-col items-center justify-center gap-3 p-4 cursor-pointer group"
         onDoubleClick={() => window.canvas.files.openExternal(data.filePath)}
       >
-        {/* PDF icon */}
         <div className="relative">
           <svg width="56" height="72" viewBox="0 0 56 72" fill="none">
             <rect width="56" height="72" rx="4" fill="#1a1a1a" />
@@ -66,7 +56,7 @@ function PDFNode({ data, selected, width, height }: NodeProps & { data: MediaNod
           {data.label}
         </div>
       )}
-    </div>
+    </NodeShell>
   )
 }
 

@@ -1,6 +1,7 @@
 import { memo, useState, useRef, useEffect, useCallback } from 'react'
-import { Handle, Position, NodeResizer, useReactFlow, type NodeProps } from '@xyflow/react'
+import { useReactFlow, type NodeProps } from '@xyflow/react'
 import type { TextNodeData } from '../../types'
+import NodeShell from './NodeShell'
 
 function TextNode({ data, selected, width, height, id }: NodeProps & { data: TextNodeData; width?: number; height?: number }) {
   const { updateNodeData } = useReactFlow()
@@ -8,7 +9,6 @@ function TextNode({ data, selected, width, height, id }: NodeProps & { data: Tex
   const [draft, setDraft]     = useState(data.content ?? '')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Sync draft if data.content changes from outside (e.g. undo)
   useEffect(() => { if (!editing) setDraft(data.content ?? '') }, [data.content, editing])
   useEffect(() => { if (editing) textareaRef.current?.focus() }, [editing])
 
@@ -17,27 +17,18 @@ function TextNode({ data, selected, width, height, id }: NodeProps & { data: Tex
     updateNodeData(id, { content: draft })
   }, [id, draft, updateNodeData])
 
-  const style: React.CSSProperties = {
-    background: data.nodeStyle?.backgroundColor ?? '#141414',
-    borderColor: data.nodeStyle?.borderColor ?? (selected ? '#E8B547' : '#242424'),
-    borderWidth: data.nodeStyle?.borderWidth ?? 1,
-    borderStyle: 'solid',
+  const innerStyle: React.CSSProperties = {
+    background:   data.nodeStyle?.backgroundColor ?? '#141414',
+    borderColor:  data.nodeStyle?.borderColor ?? (selected ? '#E8B547' : '#242424'),
+    borderWidth:  data.nodeStyle?.borderWidth ?? 1,
+    borderStyle:  'solid',
     borderRadius: data.nodeStyle?.borderRadius ?? 8,
-    opacity: data.nodeStyle?.opacity ?? 1,
-    width: width ?? 260,
-    height: height ?? 180,
+    opacity:      data.nodeStyle?.opacity ?? 1,
   }
 
   return (
-    <div className="relative flex flex-col overflow-hidden" style={style}>
-      <NodeResizer minWidth={120} minHeight={80} isVisible={selected} />
-
-      <Handle type="source" position={Position.Top}    id="s-top"    style={{ left: '50%', top: -5 }} />
-      <Handle type="source" position={Position.Right}  id="s-right"  style={{ right: -5, top: '50%' }} />
-      <Handle type="source" position={Position.Bottom} id="s-bottom" style={{ left: '50%', bottom: -5 }} />
-      <Handle type="source" position={Position.Left}   id="s-left"   style={{ left: -5, top: '50%' }} />
-      <Handle type="target" position={Position.Top}    id="t-top"    style={{ left: '30%', top: -5 }} />
-      <Handle type="target" position={Position.Bottom} id="t-bottom" style={{ left: '30%', bottom: -5 }} />
+    <NodeShell id={id} selected={selected} width={width ?? 260} height={height ?? 180}
+      minWidth={120} minHeight={80} innerStyle={innerStyle} innerClassName="flex flex-col">
 
       {data.label && (
         <div className="px-3 py-1.5 text-[11.7px] font-medium text-text-muted border-b border-white/5 flex-shrink-0 truncate">
@@ -67,7 +58,7 @@ function TextNode({ data, selected, width, height, id }: NodeProps & { data: Tex
           </div>
         )}
       </div>
-    </div>
+    </NodeShell>
   )
 }
 

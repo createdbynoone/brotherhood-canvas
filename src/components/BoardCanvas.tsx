@@ -301,6 +301,7 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
         multiSelectionKeyCode="Shift"
         defaultEdgeOptions={{ style: { stroke: '#3a3a3a', strokeWidth: 1.5 } }}
         connectionLineStyle={{ stroke: '#E8B547', strokeWidth: 2, strokeDasharray: '6 3' }}
+        connectionMode={'loose' as any}
         proOptions={{ hideAttribution: true }}
       >
         {bgVariant && <Background variant={bgVariant} color="#1e1e1e" gap={20} size={1.5} />}
