@@ -248,11 +248,16 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
 
   return (
     <div ref={wrapperRef} className="relative w-full h-full">
-      {/* Drop highlight */}
+      {/* Drop overlay — Sorter style */}
       {dropping && (
-        <div className="absolute inset-0 z-50 m-2 rounded-lg border-2 border-dashed border-accent/50 pointer-events-none flex items-center justify-center">
-          <div className="bg-surface/90 backdrop-blur-sm rounded-xl px-6 py-3 border border-accent/20">
-            <p className="text-[13.7px] text-accent font-medium">Drop files to add</p>
+        <div className="absolute inset-0 z-50 pointer-events-none">
+          <div className="absolute inset-3 rounded-xl border-2 border-dashed border-accent/60 bg-accent/[0.04] flex flex-col items-center justify-center gap-3">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" className="text-accent">
+              <path d="M16 4v16M8 12l8-8 8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M4 24h24" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            <span className="font-heading font-semibold text-sm uppercase tracking-widest text-accent">Drop to add</span>
+            <span className="font-mono text-[11.7px] text-accent/50">Images · Video · PDF · Text</span>
           </div>
         </div>
       )}

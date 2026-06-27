@@ -34,7 +34,7 @@ export default function UpdateBar() {
               style={{ width: `${(status as { pct: number }).pct}%` }}
             />
           </div>
-          <span>{(status as { pct: number }).pct}%</span>
+          <span className="font-mono tabular-nums">{(status as { pct: number }).pct}%</span>
         </>
       )}
 

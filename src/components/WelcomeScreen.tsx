@@ -93,8 +93,8 @@ export default function WelcomeScreen({ onVaultReady }: Props) {
           <div className="w-4 h-4 rounded-full border-2 border-accent border-t-transparent animate-spin" />
         )}
 
-        <p className="text-[11.7px] text-text-muted text-center">
-          Boards are saved as JSON files in a local folder you choose — no cloud, no sync.
+        <p className="font-mono text-[10.7px] text-text-muted text-center tracking-wide">
+          Boards are saved as JSON files in a local folder — no cloud, no sync.
         </p>
       </div>
     </div>

@@ -108,7 +108,7 @@ export default function Toolbar({
 
       <button
         onClick={onZoomFit}
-        className="px-1.5 h-7 text-[11.7px] text-text-secondary hover:text-text-primary transition-colors font-mono min-w-[42px] text-center"
+        className="px-1.5 h-7 font-mono text-[11px] text-text-secondary hover:text-text-primary transition-colors min-w-[42px] text-center tabular-nums"
         title="Fit view (F)"
       >
         {Math.round(zoom * 100)}%

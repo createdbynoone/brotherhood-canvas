@@ -55,6 +55,11 @@ export default function Sidebar({ boards, activeBoardId, onSelect, onCreate, onD
       className="w-56 h-full flex flex-col border-r border-border bg-surface flex-shrink-0"
       onClick={() => setCtxMenu(null)}
     >
+      {/* Header */}
+      <div className="px-3 pt-3 pb-2 border-b border-border">
+        <span className="font-heading font-semibold text-[10.7px] uppercase tracking-widest text-text-muted">Boards</span>
+      </div>
+
       {/* Search */}
       <div className="px-3 py-2 border-b border-border">
         <div className="relative">
@@ -63,10 +68,10 @@ export default function Sidebar({ boards, activeBoardId, onSelect, onCreate, onD
           </svg>
           <input
             type="text"
-            placeholder="Search boards…"
+            placeholder="Search…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="no-drag w-full pl-6 pr-2 py-1 bg-bg border border-border rounded-md text-[11.7px] text-text-primary placeholder-text-muted outline-none focus:border-accent/40 transition-colors"
+            className="no-drag w-full pl-6 pr-2 py-1.5 bg-bg border border-border rounded-md text-[11.7px] text-text-primary placeholder-text-muted outline-none focus:border-accent/40 transition-colors font-mono"
           />
         </div>
       </div>
@@ -104,11 +109,11 @@ export default function Sidebar({ boards, activeBoardId, onSelect, onCreate, onD
                 />
               ) : (
                 <>
-                  <span className={`text-[12.7px] font-medium truncate ${board.id === activeBoardId ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary transition-colors'}`}>
+                  <span className={`font-heading text-[12.7px] font-medium truncate ${board.id === activeBoardId ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary transition-colors'}`}>
                     {board.name}
                   </span>
-                  <span className="text-[11.7px] text-text-muted mt-0.5">
-                    {board.nodeCount} node{board.nodeCount !== 1 ? 's' : ''} · {formatDate(board.updatedAt)}
+                  <span className="font-mono text-[10.7px] text-text-muted mt-0.5">
+                    {board.nodeCount} nodes · {formatDate(board.updatedAt)}
                   </span>
                 </>
               )}
@@ -121,7 +126,7 @@ export default function Sidebar({ boards, activeBoardId, onSelect, onCreate, onD
       <div className="border-t border-border p-2">
         <button
           onClick={onCreate}
-          className="no-drag w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-[12.7px] text-text-secondary hover:text-text-primary hover:bg-white/[0.04] transition-colors"
+          className="no-drag w-full flex items-center justify-center gap-1.5 py-2 rounded-lg font-heading font-semibold text-[11.7px] uppercase tracking-widest text-text-muted hover:text-text-primary hover:bg-white/[0.04] transition-colors"
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 5v14M5 12h14" />
