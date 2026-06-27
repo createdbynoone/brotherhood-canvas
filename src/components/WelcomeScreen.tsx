@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { VaultState } from '../types'
+import appIcon from '../assets/icon.png'
 
 interface Props {
   onVaultReady: (vault: VaultState) => void
@@ -48,18 +49,7 @@ export default function WelcomeScreen({ onVaultReady }: Props) {
       <div className="no-drag flex flex-col items-center gap-8 max-w-md w-full px-8">
         {/* Logo / Icon */}
         <div className="flex flex-col items-center gap-3">
-          <div className="w-16 h-16 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#E8B547" strokeWidth="1.5" strokeLinecap="round">
-              <rect x="3" y="3" width="7" height="7" rx="1.5" />
-              <rect x="14" y="3" width="7" height="7" rx="1.5" />
-              <rect x="3" y="14" width="7" height="7" rx="1.5" />
-              <rect x="14" y="14" width="7" height="7" rx="1.5" />
-              <line x1="10" y1="6.5" x2="14" y2="6.5" />
-              <line x1="10" y1="17.5" x2="14" y2="17.5" />
-              <line x1="6.5" y1="10" x2="6.5" y2="14" />
-              <line x1="17.5" y1="10" x2="17.5" y2="14" />
-            </svg>
-          </div>
+          <img src={appIcon} alt="Brotherhood Canvas" className="w-24 h-24" draggable={false} />
           <div className="text-center">
             <h1 className="font-heading text-[22px] font-semibold text-text-primary tracking-tight">
               Brotherhood Canvas
