@@ -288,8 +288,8 @@ function setupAutoUpdater(): void {
     pushUpdate({ phase: 'available', version: info.version })
 
     const arch     = process.arch === 'arm64' ? '-arm64' : ''
-    const filename = `Brotherhood Canvas-${info.version}${arch}.dmg`
-    const dmgUrl   = `https://github.com/createdbynoone/brotherhood-canvas/releases/download/v${info.version}/${encodeURIComponent(filename)}`
+    const filename = `Brotherhood.Canvas-${info.version}${arch}.dmg`
+    const dmgUrl   = `https://github.com/createdbynoone/brotherhood-canvas/releases/download/v${info.version}/${filename}`
     const dmgPath  = join(app.getPath('temp'), filename)
 
     try {
