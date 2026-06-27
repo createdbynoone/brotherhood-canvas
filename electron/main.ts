@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, protocol, dialog, shell, nativeImage, Menu } from 'electron'
+import { app, BrowserWindow, ipcMain, protocol, dialog, shell, nativeImage, Menu, net } from 'electron'
 import { join } from 'path'
 import {
   readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync,
@@ -8,7 +8,6 @@ import { createHash } from 'crypto'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { homedir } from 'os'
-import https from 'https'
 import { v4 as uuidv4 } from 'uuid'
 import electronUpdater from 'electron-updater'
 
@@ -237,26 +236,28 @@ function pushUpdate(status: unknown): void {
   mainWindow?.webContents.send('update-status', status)
 }
 
-function downloadWithProgress(url: string, dest: string, onPct: (n: number) => void): Promise<void> {
-  if (!url.startsWith('https://')) return Promise.reject(new Error('HTTPS only'))
-  return new Promise((resolve, reject) => {
-    const attempt = (u: string) => {
-      if (!u.startsWith('https://')) { reject(new Error('Redirect blocked')); return }
-      const parsed = new URL(u)
-      https.get({ hostname: parsed.hostname, path: parsed.pathname + parsed.search }, (res) => {
-        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          attempt(res.headers.location); return
+async function downloadWithProgress(url: string, dest: string, onPct: (n: number) => void): Promise<void> {
+  const response = await net.fetch(url)
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  const total = parseInt(response.headers.get('content-length') ?? '0', 10)
+  let received = 0
+  await new Promise<void>((resolve, reject) => {
+    const file = createWriteStream(dest)
+    file.on('error', reject)
+    file.on('finish', resolve)
+    const reader = response.body!.getReader()
+    const pump = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) { file.end(); break }
+          file.write(Buffer.from(value))
+          received += value.length
+          if (total > 0) onPct(Math.round(received / total * 100))
         }
-        const total = parseInt(res.headers['content-length'] ?? '0', 10)
-        let received = 0
-        const file = createWriteStream(dest)
-        res.on('data', (chunk: Buffer) => { received += chunk.length; if (total > 0) onPct(Math.round(received / total * 100)) })
-        res.pipe(file)
-        file.on('finish', () => file.close(() => resolve()))
-        file.on('error', reject)
-      }).on('error', reject)
+      } catch (err) { file.destroy(err as Error); reject(err) }
     }
-    attempt(url)
+    pump()
   })
 }
 
