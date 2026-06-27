@@ -19,6 +19,7 @@ import PDFNode from './nodes/PDFNode'
 import TextNode from './nodes/TextNode'
 import NoteNode from './nodes/NoteNode'
 import TitleNode from './nodes/TitleNode'
+import CustomEdge from './edges/CustomEdge'
 
 // ─── Node type registry ───────────────────────────────────────────────────────
 const NODE_TYPES = {
@@ -29,6 +30,8 @@ const NODE_TYPES = {
   note: NoteNode,
   title: TitleNode,
 }
+
+const EDGE_TYPES = { default: CustomEdge }
 
 const DEFAULT_SIZES: Record<string, [number, number]> = {
   image: [240, 200],
@@ -285,6 +288,7 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
         nodes={nodes}
         edges={edges}
         nodeTypes={NODE_TYPES}
+        edgeTypes={EDGE_TYPES}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
