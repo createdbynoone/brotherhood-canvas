@@ -21,6 +21,39 @@ import NoteNode from './nodes/NoteNode'
 import TitleNode from './nodes/TitleNode'
 import CustomEdge from './edges/CustomEdge'
 
+// ─── Module-level canvas clipboard (persists across board switches) ──────────
+let canvasClipboard: { nodes: Node[]; edges: Edge[] } | null = null
+
+// ─── Measure natural media dimensions preserving aspect ratio ────────────────
+function getMediaDimensions(nodeType: string, url: string): Promise<[number, number]> {
+  const MAX = 480
+  if (nodeType === 'image') {
+    return new Promise(resolve => {
+      const img = new Image()
+      img.onload = () => {
+        const w = img.naturalWidth || 240, h = img.naturalHeight || 200
+        const r = Math.min(MAX / w, MAX / h, 1)
+        resolve([Math.round(w * r), Math.round(h * r)])
+      }
+      img.onerror = () => resolve([240, 200])
+      img.src = url
+    })
+  }
+  if (nodeType === 'video') {
+    return new Promise(resolve => {
+      const v = document.createElement('video')
+      v.onloadedmetadata = () => {
+        const w = v.videoWidth || 280, h = v.videoHeight || 200
+        const r = Math.min(MAX / w, MAX / h, 1)
+        resolve([Math.round(w * r), Math.round(h * r)])
+      }
+      v.onerror = () => resolve([280, 200])
+      v.src = url; v.load()
+    })
+  }
+  return Promise.resolve(DEFAULT_SIZES[nodeType] ?? [200, 160])
+}
+
 // ─── Node type registry ───────────────────────────────────────────────────────
 const NODE_TYPES = {
   image: ImageNode,
@@ -195,17 +228,60 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
-      if (e.key === 'v' || e.key === 'V') setTool('select')
-      if (e.key === 'h' || e.key === 'H') setTool('pan')
-      if (e.key === 't' || e.key === 'T') addTitle()
-      if (e.key === 'f' || e.key === 'F') fitView({ padding: 0.2, duration: 300 })
-      if ((e.key === '+' || e.key === '=') && !e.metaKey && !e.ctrlKey) zoomIn({ duration: 200 })
-      if (e.key === '-' && !e.metaKey && !e.ctrlKey) zoomOut({ duration: 200 })
+
+      // Copy selected nodes + their edges
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+        const selected = nodesRef.current.filter(n => n.selected)
+        if (!selected.length) return
+        const ids = new Set(selected.map(n => n.id))
+        canvasClipboard = {
+          nodes: selected,
+          edges: edgesRef.current.filter(ed => ids.has(ed.source) && ids.has(ed.target)),
+        }
+        return
+      }
+
+      // Paste — centered on current viewport, works across boards
+      if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
+        if (!canvasClipboard?.nodes.length) return
+        const idMap = new Map<string, string>()
+        canvasClipboard.nodes.forEach(n => idMap.set(n.id, crypto.randomUUID()))
+        const center = screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
+        const xs = canvasClipboard.nodes.map(n => n.position.x)
+        const ys = canvasClipboard.nodes.map(n => n.position.y)
+        const ox = (Math.min(...xs) + Math.max(...xs)) / 2
+        const oy = (Math.min(...ys) + Math.max(...ys)) / 2
+        const newNodes = canvasClipboard.nodes.map(n => ({
+          ...n,
+          id: idMap.get(n.id)!,
+          position: { x: center.x + (n.position.x - ox), y: center.y + (n.position.y - oy) },
+          selected: true,
+          data: { ...n.data },
+        }))
+        const newEdges = canvasClipboard.edges.map(ed => ({
+          ...ed,
+          id: crypto.randomUUID(),
+          source: idMap.get(ed.source)!,
+          target: idMap.get(ed.target)!,
+        }))
+        setNodes(ns => [...ns.map(n => ({ ...n, selected: false })), ...newNodes])
+        if (newEdges.length) setEdges(es => [...es, ...newEdges])
+        return
+      }
+
+      if (!e.metaKey && !e.ctrlKey) {
+        if (e.key === 'v' || e.key === 'V') setTool('select')
+        if (e.key === 'h' || e.key === 'H') setTool('pan')
+        if (e.key === 't' || e.key === 'T') addTitle()
+        if (e.key === 'f' || e.key === 'F') fitView({ padding: 0.2, duration: 300 })
+        if (e.key === '+' || e.key === '=') zoomIn({ duration: 200 })
+        if (e.key === '-') zoomOut({ duration: 200 })
+      }
       if (e.key === 'Escape') { setContextMenu(null); setStylePanelId(null) }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [fitView, zoomIn, zoomOut, addTitle])
+  }, [fitView, zoomIn, zoomOut, addTitle, screenToFlowPosition, setNodes, setEdges])
 
   // ─── Drag and drop ───────────────────────────────────────────────────────────
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -222,19 +298,22 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
     if (!files.length) return
     const basePos = screenToFlowPosition({ x: e.clientX, y: e.clientY })
     const added: Node[] = []
-    for (let i = 0; i < files.length; i++) {
-      const path = (files[i] as any).path as string
+    let offsetX = 0
+    for (const file of files) {
+      const path = (file as any).path as string
       if (!path) continue
       try {
         const imp = await window.canvas.files.import(path)
-        const [w, h] = DEFAULT_SIZES[imp.nodeType] ?? [200, 160]
+        const url = window.canvas.files.localUrl(imp.relativePath)
+        const [w, h] = await getMediaDimensions(imp.nodeType, url)
         added.push({
           id: crypto.randomUUID(),
           type: imp.nodeType,
-          position: { x: basePos.x + i * (w + 20), y: basePos.y },
+          position: { x: basePos.x + offsetX, y: basePos.y },
           data: { filePath: imp.relativePath, fileName: imp.fileName, mimeType: imp.mimeType, fileSize: imp.fileSize, content: imp.content ?? '' } as AnyNodeData,
           width: w, height: h,
         })
+        offsetX += w + 20
       } catch { /* skip */ }
     }
     if (added.length) setNodes(ns => [...ns, ...added])

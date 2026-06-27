@@ -440,10 +440,18 @@ ipcMain.handle('boards:save', (_e, board: BoardMeta & Record<string, unknown>) =
   if (!vaultPath) throw new Error('No vault')
   if (typeof board?.id !== 'string') throw new Error('Invalid board')
   const p = vaultFile(`${BOARDS_DIR}/${board.id}.json`)
-  writeFileSync(p, JSON.stringify(board, null, 2))
+  // Preserve name set by boards:rename — auto-save must not overwrite a rename
+  // (boardMetaRef in renderer goes stale after rename)
+  let name = String(board.name ?? 'Untitled')
+  if (existsSync(p)) {
+    try { name = JSON.parse(readFileSync(p, 'utf-8')).name || name } catch {}
+  }
+  writeFileSync(p, JSON.stringify({ ...board, name }, null, 2))
   const idx = loadBoardIndex()
+  const existingMeta = idx.boards.find(b => b.id === board.id)
   const meta: BoardMeta = {
-    id: board.id, name: String(board.name ?? 'Untitled'),
+    id: board.id,
+    name: existingMeta?.name || name,  // index name wins (updated atomically by rename)
     createdAt: String(board.createdAt ?? new Date().toISOString()),
     updatedAt: String(board.updatedAt ?? new Date().toISOString()),
     nodeCount: Array.isArray(board.nodes) ? board.nodes.length : 0,

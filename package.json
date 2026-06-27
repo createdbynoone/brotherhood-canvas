@@ -1,6 +1,6 @@
 {
   "name": "brotherhood-canvas",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "Brotherhood Canvas — dynamic mind maps and moodboards",
   "main": "out/main/main.js",
   "type": "module",
