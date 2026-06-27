@@ -15,43 +15,44 @@ export default function UpdateBar() {
 
   if (status.phase === 'idle' || dismissed) return null
 
-  const isAvailable = status.phase === 'available'
-  const isDownloading = status.phase === 'downloading'
-  const isInstalling = status.phase === 'installing'
-  const isReady = status.phase === 'ready'
-  const isError = status.phase === 'error'
-
   return (
     <div className="no-drag flex items-center gap-3 px-4 py-1.5 bg-surface border-b border-border text-[11.7px] text-text-secondary">
-      {isAvailable && (
+
+      {status.phase === 'available' && (
         <>
-          <span>Update available — v{(status as { version: string }).version}</span>
-          <button onClick={() => window.canvas.app.checkForUpdates()} className="text-accent hover:underline">Download</button>
+          <span className="text-accent">↓</span>
+          <span>Downloading update v{(status as { version: string }).version}…</span>
           <button onClick={() => setDismissed(true)} className="ml-auto text-text-muted hover:text-text-secondary">✕</button>
         </>
       )}
-      {isDownloading && (
+
+      {status.phase === 'downloading' && (
         <>
-          <div className="w-24 h-1 bg-border rounded-full overflow-hidden">
-            <div className="h-full bg-accent transition-all" style={{ width: `${(status as { pct: number }).pct}%` }} />
+          <div className="w-28 h-1.5 bg-border rounded-full overflow-hidden flex-shrink-0">
+            <div
+              className="h-full bg-accent rounded-full transition-all duration-300"
+              style={{ width: `${(status as { pct: number }).pct}%` }}
+            />
           </div>
-          <span>Downloading… {(status as { pct: number }).pct}%</span>
+          <span>{(status as { pct: number }).pct}%</span>
         </>
       )}
-      {isInstalling && <span>Installing update…</span>}
-      {isReady && (
-        <>
-          <span>Ready to install — v{(status as { version: string }).version}</span>
-          <button onClick={() => window.canvas.app.installUpdate()} className="text-accent hover:underline">Restart &amp; Install</button>
-          <button onClick={() => setDismissed(true)} className="ml-auto text-text-muted hover:text-text-secondary">✕</button>
-        </>
+
+      {status.phase === 'installing' && (
+        <span>Installing update… app will restart shortly</span>
       )}
-      {isError && (
+
+      {status.phase === 'ready' && (
+        <span className="text-accent">Update installed — restarting…</span>
+      )}
+
+      {status.phase === 'error' && (
         <>
           <span className="text-red-400">Update error: {(status as { message: string }).message}</span>
           <button onClick={() => setDismissed(true)} className="ml-auto text-text-muted hover:text-text-secondary">✕</button>
         </>
       )}
+
     </div>
   )
 }

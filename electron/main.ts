@@ -5,14 +5,15 @@ import {
   unlinkSync, createWriteStream,
 } from 'fs'
 import { createHash } from 'crypto'
-import { exec } from 'child_process'
+import { execFile } from 'child_process'
 import { promisify } from 'util'
+import { homedir } from 'os'
 import https from 'https'
 import { v4 as uuidv4 } from 'uuid'
 import electronUpdater from 'electron-updater'
 
 const { autoUpdater } = electronUpdater
-const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
 
 // ─── Icon styles ──────────────────────────────────────────────────────────────
 const ICON_STYLES = ['Default', 'Dark', 'ClearLight', 'ClearDark', 'TintedLight', 'TintedDark'] as const
@@ -231,7 +232,7 @@ function importFileToVault(sourcePath: string): ImportResult {
   return result
 }
 
-// ─── Auto-update helpers ──────────────────────────────────────────────────────
+// ─── Auto-update (BMP pattern) ───────────────────────────────────────────────
 function pushUpdate(status: unknown): void {
   mainWindow?.webContents.send('update-status', status)
 }
@@ -259,26 +260,57 @@ function downloadWithProgress(url: string, dest: string, onPct: (n: number) => v
   })
 }
 
-async function doInstallUpdate(downloadUrl?: string): Promise<void> {
-  if (!downloadUrl) { autoUpdater.quitAndInstall(false, true); return }
-  const tmp     = app.getPath('temp')
-  const dmgPath = join(tmp, 'BrotherhoodCanvas-update.dmg')
-  pushUpdate({ phase: 'downloading', pct: 0 })
-  await downloadWithProgress(downloadUrl, dmgPath, pct => pushUpdate({ phase: 'downloading', pct }))
-  pushUpdate({ phase: 'installing' })
+async function installFromDmg(dmgPath: string): Promise<void> {
+  const { stdout } = await execFileAsync('hdiutil', ['attach', dmgPath, '-nobrowse', '-plist'])
+  const mountMatch = stdout.match(/<key>mount-point<\/key>\s*<string>([^<]+)<\/string>/)
+  if (!mountMatch) throw new Error('DMG mount point not found')
+  const mountPoint = mountMatch[1].trim()
   try {
-    const { stdout } = await execAsync(`hdiutil attach -nobrowse -plist "${dmgPath}"`)
-    const mps = stdout.match(/<string>(\/Volumes\/[^<]+)<\/string>/g)?.map(s => s.replace(/<\/?string>/g, ''))
-    if (!mps?.length) throw new Error('No mount point')
-    const mp     = mps[mps.length - 1]
-    const appDir = readdirSync(mp).find(f => f.endsWith('.app'))
+    const appDir = readdirSync(mountPoint).find(f => f.endsWith('.app'))
     if (!appDir) throw new Error('No .app in DMG')
-    await execAsync(`ditto "${join(mp, appDir)}" "/Applications/${appDir}"`)
-    await execAsync(`hdiutil detach -quiet -force "${mp}"`)
-    app.relaunch(); app.quit()
-  } catch {
-    await shell.openPath(dmgPath)
+    await execFileAsync('ditto', [join(mountPoint, appDir), join('/Applications', appDir)])
+    app.relaunch()
+    app.quit()
+  } finally {
+    execFileAsync('hdiutil', ['detach', mountPoint, '-quiet', '-force']).catch(() => {})
   }
+}
+
+function setupAutoUpdater(): void {
+  if (!app.isPackaged) return
+
+  autoUpdater.autoDownload = false
+  autoUpdater.autoInstallOnAppQuit = false
+  autoUpdater.logger = null
+
+  autoUpdater.on('update-available', async (info) => {
+    pushUpdate({ phase: 'available', version: info.version })
+
+    const arch     = process.arch === 'arm64' ? '-arm64' : ''
+    const filename = `Brotherhood Canvas-${info.version}${arch}.dmg`
+    const dmgUrl   = `https://github.com/createdbynoone/brotherhood-canvas/releases/download/v${info.version}/${encodeURIComponent(filename)}`
+    const dmgPath  = join(app.getPath('temp'), filename)
+
+    try {
+      await downloadWithProgress(dmgUrl, dmgPath, pct => pushUpdate({ phase: 'downloading', pct }))
+      pushUpdate({ phase: 'installing' })
+      await installFromDmg(dmgPath)
+    } catch (err) {
+      pushUpdate({ phase: 'error', message: String((err as Error).message ?? err) })
+      // Fallback: copy DMG to Desktop and open it
+      const desktopPath = join(homedir(), 'Desktop', filename)
+      try {
+        await downloadWithProgress(dmgUrl, desktopPath, () => {})
+        await shell.openPath(desktopPath)
+      } catch { /* ignore */ }
+    }
+  })
+
+  autoUpdater.on('error', err => pushUpdate({ phase: 'error', message: String(err?.message ?? err) }))
+
+  mainWindow!.webContents.once('did-finish-load', () => {
+    setTimeout(() => autoUpdater.checkForUpdates(), 3000)
+  })
 }
 
 // ─── Window ───────────────────────────────────────────────────────────────────
@@ -344,24 +376,7 @@ app.whenReady().then(() => {
   buildAppMenu()
   applyDockIcon(loadPrefs().iconStyle ?? 'Default')
   createWindow()
-
-  // Auto-update setup
-  autoUpdater.autoDownload = false
-  autoUpdater.logger = null
-  let pendingDmgUrl: string | undefined
-
-  autoUpdater.on('update-available', info => pushUpdate({ phase: 'available', version: info.version }))
-  autoUpdater.on('download-progress', p => pushUpdate({ phase: 'downloading', pct: Math.round(p.percent) }))
-  autoUpdater.on('update-downloaded', info => {
-    pendingDmgUrl = (info as unknown as Record<string, unknown>).downloadedFile as string | undefined
-    pushUpdate({ phase: 'ready', version: info.version })
-  })
-  autoUpdater.on('error', err => pushUpdate({ phase: 'error', message: String(err?.message ?? err) }))
-
-  if (app.isPackaged) setTimeout(() => autoUpdater.checkForUpdates(), 4000)
-
-  // Install IPC that needs pendingDmgUrl closure
-  ipcMain.handle('update:install', () => doInstallUpdate(pendingDmgUrl))
+  setupAutoUpdater()
 
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow() })
 })
