@@ -270,8 +270,10 @@ async function installFromDmg(dmgPath: string): Promise<void> {
     const appDir = readdirSync(mountPoint).find(f => f.endsWith('.app'))
     if (!appDir) throw new Error('No .app in DMG')
     await execFileAsync('ditto', [join(mountPoint, appDir), join('/Applications', appDir)])
-    app.relaunch()
-    app.quit()
+    // 1500ms delay before relaunch — lets the OS fully flush ditto to disk
+    // before the new process reads the binary (same pattern as BMP)
+    pushUpdate({ phase: 'ready', version: '' })
+    setTimeout(() => { app.relaunch(); app.quit() }, 1500)
   } finally {
     execFileAsync('hdiutil', ['detach', mountPoint, '-quiet', '-force']).catch(() => {})
   }
@@ -284,7 +286,12 @@ function setupAutoUpdater(): void {
   autoUpdater.autoInstallOnAppQuit = false
   autoUpdater.logger = null
 
+  let updating = false  // guard — prevents re-running if update-available fires twice
+
   autoUpdater.on('update-available', async (info) => {
+    if (updating) return
+    updating = true
+
     pushUpdate({ phase: 'available', version: info.version })
 
     const arch     = process.arch === 'arm64' ? '-arm64' : ''
@@ -297,8 +304,8 @@ function setupAutoUpdater(): void {
       pushUpdate({ phase: 'installing' })
       await installFromDmg(dmgPath)
     } catch (err) {
+      updating = false
       pushUpdate({ phase: 'error', message: String((err as Error).message ?? err) })
-      // Fallback: copy DMG to Desktop and open it
       const desktopPath = join(homedir(), 'Desktop', filename)
       try {
         await downloadWithProgress(dmgUrl, desktopPath, () => {})
