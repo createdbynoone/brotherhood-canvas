@@ -31,7 +31,7 @@ function TextNode({ data, selected, width, height, id }: NodeProps & { data: Tex
       minWidth={120} minHeight={80} innerStyle={innerStyle} innerClassName="flex flex-col">
 
       {data.label && (
-        <div className="px-3 py-1.5 text-[11.7px] font-medium text-text-muted border-b border-white/5 flex-shrink-0 truncate">
+        <div className="px-3 py-1.5 text-[10.7px] font-heading font-semibold uppercase tracking-widest text-text-muted border-b border-white/5 flex-shrink-0 truncate">
           {data.label}
         </div>
       )}
@@ -47,11 +47,11 @@ function TextNode({ data, selected, width, height, id }: NodeProps & { data: Tex
               e.stopPropagation()
               if (e.key === 'Escape') commitEdit()
             }}
-            className="nodrag nopan nowheel w-full h-full resize-none bg-transparent px-3 py-2 text-[13.7px] text-text-primary outline-none font-mono leading-relaxed"
+            className="nodrag nopan nowheel w-full h-full resize-none bg-transparent px-3 py-2 text-[13.7px] text-text-primary outline-none font-heading leading-relaxed"
             spellCheck={false}
           />
         ) : (
-          <div className="w-full h-full px-3 py-2 text-[13.7px] text-text-primary font-mono leading-relaxed whitespace-pre-wrap overflow-hidden cursor-text">
+          <div className="w-full h-full px-3 py-2 text-[13.7px] text-text-primary font-heading leading-relaxed whitespace-pre-wrap overflow-hidden cursor-text">
             {data.content || (
               <span className="text-text-muted italic text-[12.7px]">Double-click to edit…</span>
             )}

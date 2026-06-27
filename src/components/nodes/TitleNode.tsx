@@ -79,13 +79,13 @@ function TitleNode({ data, selected, width, height, id }: NodeProps & { data: Ti
             if (e.key === 'Escape') commit()
           }}
           style={{ fontSize, lineHeight: 1.15 }}
-          className="nodrag nopan nowheel w-full h-full resize-none bg-transparent text-center font-bold text-text-primary outline-none px-2"
+          className="nodrag nopan nowheel w-full h-full resize-none bg-transparent text-center font-heading font-bold text-text-primary outline-none px-2"
           spellCheck={false}
         />
       ) : (
         <div
           style={{ fontSize, lineHeight: 1.15 }}
-          className="w-full h-full flex items-center justify-center text-center font-bold text-text-primary px-2 cursor-text leading-tight overflow-hidden"
+          className="w-full h-full flex items-center justify-center text-center font-heading font-bold text-text-primary px-2 cursor-text leading-tight overflow-hidden"
         >
           {data.content || (
             <span className="text-text-muted/30 font-normal" style={{ fontSize: Math.min(fontSize * 0.6, 16) }}>

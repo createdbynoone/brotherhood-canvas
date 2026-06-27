@@ -52,7 +52,7 @@ function PDFNode({ data, selected, width, height, id }: NodeProps & { data: Medi
       </div>
 
       {data.label && (
-        <div className="px-2 py-1 text-[11.7px] text-text-secondary truncate border-t border-border/50 flex-shrink-0">
+        <div className="px-2 py-1 text-[10.7px] font-heading font-semibold uppercase tracking-widest text-text-secondary truncate border-t border-border/50 flex-shrink-0">
           {data.label}
         </div>
       )}

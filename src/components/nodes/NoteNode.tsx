@@ -37,7 +37,7 @@ function NoteNode({ data, selected, width, height, id }: NodeProps & { data: Not
       <div className="flex-shrink-0 h-[3px] rounded-t-[9px]" style={{ background: noteColor }} />
 
       {data.label && (
-        <div className="px-3 pt-2 text-[11.7px] font-semibold truncate flex-shrink-0" style={{ color: noteColor }}>
+        <div className="px-3 pt-2 text-[10.7px] font-heading font-semibold uppercase tracking-widest truncate flex-shrink-0" style={{ color: noteColor }}>
           {data.label}
         </div>
       )}
