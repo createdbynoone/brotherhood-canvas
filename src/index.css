@@ -29,10 +29,8 @@ html, body, #root {
   border: 2px solid #E8B547;
   border-radius: 50%;
   opacity: 0;
-  /* Use CSS `scale` (individual transform property) so it doesn't override
-     React Flow's inline transform: translate(...) used for edge centering */
-  scale: 1;
-  transition: opacity 0.12s, background 0.12s, scale 0.15s;
+  /* transition on transform (not scale property) */
+  transition: opacity 0.12s, background 0.12s, transform 0.15s;
   z-index: 10;
   cursor: crosshair;
 }
@@ -40,10 +38,24 @@ html, body, #root {
 .react-flow__node.selected .react-flow__handle {
   opacity: 1;
 }
-.react-flow__handle:hover {
-  scale: 1.45;
-  background: #E8B547;
-}
+/*
+  scale() must live INSIDE the transform shorthand, not as a CSS `scale` property.
+  Reason: individual transform properties (CSS `scale`) compose AFTER the
+  `transform` shorthand per spec — so their transform-origin (center of layout box)
+  diverges from the visual center set by translate(-50%,-50%), causing drift.
+  With both in the same shorthand, scale runs first → stays at origin (0,0) →
+  translate moves it to the edge. Visual center is fixed at any scale value.
+*/
+.react-flow__handle-top    { transform: translate(-50%, -50%) scale(1); }
+.react-flow__handle-right  { transform: translate(50%,  -50%) scale(1); }
+.react-flow__handle-bottom { transform: translate(-50%,  50%) scale(1); }
+.react-flow__handle-left   { transform: translate(-50%, -50%) scale(1); }
+
+.react-flow__handle-top:hover    { transform: translate(-50%, -50%) scale(1.45); }
+.react-flow__handle-right:hover  { transform: translate(50%,  -50%) scale(1.45); }
+.react-flow__handle-bottom:hover { transform: translate(-50%,  50%) scale(1.45); }
+.react-flow__handle-left:hover   { transform: translate(-50%, -50%) scale(1.45); }
+
 .react-flow__handle-connecting {
   opacity: 1 !important;
   background: #E8B547 !important;
