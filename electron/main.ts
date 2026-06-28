@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, protocol, dialog, shell, nativeImage, Menu, net } from 'electron'
 import { join } from 'path'
+import { pathToFileURL } from 'url'
 import {
   readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync,
   unlinkSync, createWriteStream,
@@ -366,16 +367,16 @@ app.on('second-instance', () => {
 })
 
 app.whenReady().then(() => {
-  // Serve vault files via localfile:// protocol
+  // Serve vault files via localfile:// protocol.
+  // Delegates to net.fetch('file://') so Electron handles Range requests
+  // natively — required for video seeking and streaming.
   protocol.handle('localfile', req => {
     try {
-      const rel  = decodeURIComponent(req.url.replace('localfile://', ''))
+      const rel = decodeURIComponent(req.url.replace('localfile://', ''))
       if (!vaultPath) return new Response('No vault', { status: 404 })
-      const abs  = join(vaultPath, rel)
+      const abs = join(vaultPath, rel)
       if (!existsSync(abs)) return new Response('Not found', { status: 404 })
-      const ext  = (abs.split('.').pop() ?? '').toLowerCase()
-      const data = readFileSync(abs)
-      return new Response(data, { headers: { 'Content-Type': getMime(ext) } })
+      return net.fetch(pathToFileURL(abs).href, { headers: req.headers })
     } catch {
       return new Response('Error', { status: 500 })
     }

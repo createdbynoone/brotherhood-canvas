@@ -1,12 +1,39 @@
-import { memo, useRef, useState } from 'react'
+import { memo, useRef, useState, useEffect } from 'react'
 import { type NodeProps } from '@xyflow/react'
 import type { MediaNodeData } from '../../types'
 import NodeShell from './NodeShell'
 
 function VideoNode({ data, selected, width, height, id }: NodeProps & { data: MediaNodeData; width?: number; height?: number }) {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const [playing, setPlaying] = useState(false)
+  const videoRef  = useRef<HTMLVideoElement>(null)
+  const [playing,   setPlaying]   = useState(false)
+  const [thumbnail, setThumbnail] = useState<string | null>(null)
   const url = window.canvas.files.localUrl(data.filePath)
+
+  // Extract first frame as poster image so we never show a black screen
+  useEffect(() => {
+    let cancelled = false
+    const v = document.createElement('video')
+    v.preload = 'auto'
+    v.muted   = true
+    v.src     = url
+
+    v.addEventListener('loadeddata', () => {
+      if (!cancelled) v.currentTime = 0.05
+    })
+    v.addEventListener('seeked', () => {
+      if (cancelled) return
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width  = v.videoWidth  || 320
+        canvas.height = v.videoHeight || 240
+        canvas.getContext('2d')?.drawImage(v, 0, 0, canvas.width, canvas.height)
+        setThumbnail(canvas.toDataURL('image/jpeg', 0.82))
+      } catch { /* tainted canvas — leave thumbnail null */ }
+      v.src = ''
+    })
+    v.load()
+    return () => { cancelled = true; v.src = '' }
+  }, [url])
 
   const innerStyle: React.CSSProperties = {
     background:   data.nodeStyle?.backgroundColor ?? '#0c0c0c',
@@ -17,51 +44,62 @@ function VideoNode({ data, selected, width, height, id }: NodeProps & { data: Me
     opacity:      data.nodeStyle?.opacity ?? 1,
   }
 
+  function openFullscreen() {
+    window.dispatchEvent(new CustomEvent('canvas:preview', {
+      detail: { url, type: 'video', fileName: data.fileName }
+    }))
+  }
+
   function togglePlay(e: React.MouseEvent) {
     e.stopPropagation()
-    if (!videoRef.current) return
-    if (playing) { videoRef.current.pause(); setPlaying(false) }
-    else { videoRef.current.play(); setPlaying(true) }
+    const v = videoRef.current
+    if (!v) return
+    if (playing) { v.pause(); setPlaying(false) }
+    else         { v.play();  setPlaying(true)  }
   }
 
   return (
     <NodeShell id={id} selected={selected} width={width ?? 280} height={height ?? 200}
       minWidth={160} minHeight={120} innerStyle={innerStyle} innerClassName="flex flex-col">
 
-      <div
-        className="relative flex-1 overflow-hidden bg-black"
-        onDoubleClick={() => window.dispatchEvent(new CustomEvent('canvas:preview', {
-          detail: { url, type: 'video', fileName: data.fileName }
-        }))}
-      >
+      <div className="relative flex-1 bg-black overflow-hidden">
+        {/*
+          pointer-events: none — video element must NOT capture mouse events.
+          Without this, <video> intercepts mousedown and React Flow can't
+          initiate node drag from the video area.
+        */}
         <video
           ref={videoRef}
           src={url}
+          poster={thumbnail ?? undefined}
           className="w-full h-full object-contain"
+          style={{ pointerEvents: 'none', display: 'block' }}
           onEnded={() => setPlaying(false)}
-          draggable={false}
+          preload="none"
         />
-        {!playing && (
-          <button
-            onClick={e => { e.stopPropagation(); togglePlay(e) }}
-            onDoubleClick={e => e.stopPropagation()}
-            className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/20 transition-colors group nodrag nopan"
-          >
-            <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:bg-white/30 transition-colors">
+
+        {/*
+          Single overlay handles all interaction.
+          nodrag nopan: clicks here don't trigger React Flow drag (drag the
+          node by its border/label/resize handle instead).
+          Single click = play/pause. Double click = fullscreen lightbox.
+        */}
+        <div
+          className="absolute inset-0 nodrag nopan flex items-center justify-center"
+          onClick={togglePlay}
+          onDoubleClick={e => { e.stopPropagation(); openFullscreen() }}
+        >
+          {!playing && (
+            <div
+              className="w-11 h-11 rounded-full bg-white/22 hover:bg-white/32 backdrop-blur-sm flex items-center justify-center transition-colors"
+              style={{ pointerEvents: 'none' }}
+            >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
                 <path d="M5 3l14 9-14 9V3z" />
               </svg>
             </div>
-          </button>
-        )}
-        {playing && (
-          <button
-            onClick={e => { e.stopPropagation(); togglePlay(e) }}
-            onDoubleClick={e => e.stopPropagation()}
-            className="absolute inset-0 nodrag nopan opacity-0"
-            aria-label="Pause"
-          />
-        )}
+          )}
+        </div>
       </div>
 
       {data.label && (
