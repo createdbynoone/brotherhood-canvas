@@ -20,6 +20,7 @@ import TextNode from './nodes/TextNode'
 import NoteNode from './nodes/NoteNode'
 import TitleNode from './nodes/TitleNode'
 import CustomEdge from './edges/CustomEdge'
+import AlignmentGuides, { type Guide } from './AlignmentGuides'
 
 // ─── Module-level canvas clipboard (persists across board switches) ──────────
 let canvasClipboard: { nodes: Node[]; edges: Edge[] } | null = null
@@ -111,6 +112,7 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
   const [stylePanelId, setStylePanelId] = useState<string | null>(null)
   const [isLoading, setIsLoading]     = useState(true)
   const [dropping, setDropping]       = useState(false)
+  const [guides, setGuides]           = useState<Guide[]>([])
   const wrapperRef = useRef<HTMLDivElement>(null)
 
   // Stable refs for the auto-save closure
@@ -169,6 +171,79 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
   }, [])
 
   const onPaneClick = useCallback(() => { setContextMenu(null); setStylePanelId(null) }, [])
+
+  // ─── Alignment guides ────────────────────────────────────────────────────────
+  const SNAP_THRESHOLD = 8
+
+  const onNodeDrag = useCallback((_e: React.MouseEvent, node: Node) => {
+    const nw = node.width ?? 0, nh = node.height ?? 0
+    const nl = node.position.x, nr = nl + nw, ncx = nl + nw / 2
+    const nt = node.position.y, nb = nt + nh, ncy = nt + nh / 2
+    const found: Guide[] = []
+
+    for (const other of nodesRef.current) {
+      if (other.id === node.id || other.selected) continue
+      const ow = other.width ?? 0, oh = other.height ?? 0
+      const ol = other.position.x, or_ = ol + ow, ocx = ol + ow / 2
+      const ot = other.position.y, ob = ot + oh, ocy = ot + oh / 2
+
+      // Vertical guides (X alignment)
+      if (Math.abs(ncx - ocx) < SNAP_THRESHOLD) found.push({ type: 'v', pos: ocx })
+      if (Math.abs(nl  - ol)  < SNAP_THRESHOLD) found.push({ type: 'v', pos: ol })
+      if (Math.abs(nr  - or_) < SNAP_THRESHOLD) found.push({ type: 'v', pos: or_ })
+      if (Math.abs(nl  - or_) < SNAP_THRESHOLD) found.push({ type: 'v', pos: or_ })
+      if (Math.abs(nr  - ol)  < SNAP_THRESHOLD) found.push({ type: 'v', pos: ol })
+
+      // Horizontal guides (Y alignment)
+      if (Math.abs(ncy - ocy) < SNAP_THRESHOLD) found.push({ type: 'h', pos: ocy })
+      if (Math.abs(nt  - ot)  < SNAP_THRESHOLD) found.push({ type: 'h', pos: ot })
+      if (Math.abs(nb  - ob)  < SNAP_THRESHOLD) found.push({ type: 'h', pos: ob })
+      if (Math.abs(nt  - ob)  < SNAP_THRESHOLD) found.push({ type: 'h', pos: ob })
+      if (Math.abs(nb  - ot)  < SNAP_THRESHOLD) found.push({ type: 'h', pos: ot })
+    }
+
+    // Deduplicate guides at the same position
+    setGuides(found.filter((g, i, arr) =>
+      arr.findIndex(o => o.type === g.type && Math.abs(o.pos - g.pos) < 1) === i
+    ))
+  }, [])
+
+  const onNodeDragStop = useCallback((_e: React.MouseEvent, node: Node) => {
+    const nw = node.width ?? 0, nh = node.height ?? 0
+    const nl = node.position.x, nr = nl + nw, ncx = nl + nw / 2
+    const nt = node.position.y, nb = nt + nh, ncy = nt + nh / 2
+    let snapX: number | null = null, snapY: number | null = null
+
+    for (const other of nodesRef.current) {
+      if (other.id === node.id) continue
+      const ow = other.width ?? 0, oh = other.height ?? 0
+      const ol = other.position.x, or_ = ol + ow, ocx = ol + ow / 2
+      const ot = other.position.y, ob = ot + oh, ocy = ot + oh / 2
+
+      if (snapX === null) {
+        if (Math.abs(ncx - ocx) < SNAP_THRESHOLD) snapX = ocx - nw / 2
+        else if (Math.abs(nl - ol)  < SNAP_THRESHOLD) snapX = ol
+        else if (Math.abs(nr - or_) < SNAP_THRESHOLD) snapX = or_ - nw
+        else if (Math.abs(nl - or_) < SNAP_THRESHOLD) snapX = or_
+        else if (Math.abs(nr - ol)  < SNAP_THRESHOLD) snapX = ol - nw
+      }
+      if (snapY === null) {
+        if (Math.abs(ncy - ocy) < SNAP_THRESHOLD) snapY = ocy - nh / 2
+        else if (Math.abs(nt - ot)  < SNAP_THRESHOLD) snapY = ot
+        else if (Math.abs(nb - ob)  < SNAP_THRESHOLD) snapY = ob - nh
+        else if (Math.abs(nt - ob)  < SNAP_THRESHOLD) snapY = ob
+        else if (Math.abs(nb - ot)  < SNAP_THRESHOLD) snapY = ot - nh
+      }
+      if (snapX !== null && snapY !== null) break
+    }
+
+    if (snapX !== null || snapY !== null) {
+      setNodes(ns => ns.map(n =>
+        n.id !== node.id ? n : { ...n, position: { x: snapX ?? n.position.x, y: snapY ?? n.position.y } }
+      ))
+    }
+    setGuides([])
+  }, [setNodes])
 
   const onNodeContextMenu = useCallback((e: React.MouseEvent, node: Node) => {
     e.preventDefault()
@@ -371,6 +446,8 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeDrag={onNodeDrag}
+        onNodeDragStop={onNodeDragStop}
         onNodeContextMenu={onNodeContextMenu}
         onPaneClick={onPaneClick}
         onDragOver={onDragOver}
@@ -388,6 +465,7 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
         proOptions={{ hideAttribution: true }}
       >
         {bgVariant && <Background variant={bgVariant} color="#1e1e1e" gap={20} size={1.5} />}
+        <AlignmentGuides guides={guides} />
         <MiniMap
           nodeColor="#2a2a2a"
           maskColor="rgba(12,12,12,0.65)"

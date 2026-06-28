@@ -29,17 +29,19 @@ html, body, #root {
   border: 2px solid #E8B547;
   border-radius: 50%;
   opacity: 0;
-  transition: opacity 0.12s, transform 0.12s, background 0.12s;
+  /* Use CSS `scale` (individual transform property) so it doesn't override
+     React Flow's inline transform: translate(...) used for edge centering */
+  scale: 1;
+  transition: opacity 0.12s, background 0.12s, scale 0.15s;
   z-index: 10;
   cursor: crosshair;
-  /* React Flow centers handles on the edge by default */
 }
 .react-flow__node:hover .react-flow__handle,
 .react-flow__node.selected .react-flow__handle {
   opacity: 1;
 }
 .react-flow__handle:hover {
-  transform: scale(1.4);
+  scale: 1.45;
   background: #E8B547;
 }
 .react-flow__handle-connecting {
