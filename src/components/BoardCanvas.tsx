@@ -3,7 +3,7 @@ import {
   ReactFlow, ReactFlowProvider, Background, BackgroundVariant,
   MiniMap, useNodesState, useEdgesState, useReactFlow, useViewport,
   addEdge,
-  type Node, type Edge, type Connection,
+  type Node, type Edge, type Connection, type NodeChange,
 } from '@xyflow/react'
 import type {
   SerializedBoard, SerializedNode, SerializedEdge,
@@ -104,7 +104,7 @@ function fromRFEdge(e: Edge): SerializedEdge {
 function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaChange: (id: string, n: number) => void }) {
   const { screenToFlowPosition, fitView, zoomIn, zoomOut, setViewport, getViewport } = useReactFlow()
   const { zoom } = useViewport()
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([])
+  const [nodes, setNodes, applyNodesChanges] = useNodesState<Node>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
   const [background, setBackground]   = useState<BackgroundType>('dots')
   const [tool, setTool]               = useState<'select' | 'pan'>('select')
@@ -172,78 +172,64 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
 
   const onPaneClick = useCallback(() => { setContextMenu(null); setStylePanelId(null) }, [])
 
-  // ─── Alignment guides ────────────────────────────────────────────────────────
-  const SNAP_THRESHOLD = 8
+  // ─── Alignment guides — intercept position changes before React Flow applies them ──
+  const SNAP_T = 8
+  const lastGuidesKey = useRef('')
 
-  const onNodeDrag = useCallback((_e: React.MouseEvent, node: Node) => {
-    const nw = node.width ?? 0, nh = node.height ?? 0
-    const nl = node.position.x, nr = nl + nw, ncx = nl + nw / 2
-    const nt = node.position.y, nb = nt + nh, ncy = nt + nh / 2
-    const found: Guide[] = []
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    const modified = changes.map(change => {
+      if (change.type !== 'position' || !change.position) return change
 
-    for (const other of nodesRef.current) {
-      if (other.id === node.id || other.selected) continue
-      const ow = other.width ?? 0, oh = other.height ?? 0
-      const ol = other.position.x, or_ = ol + ow, ocx = ol + ow / 2
-      const ot = other.position.y, ob = ot + oh, ocy = ot + oh / 2
-
-      // Vertical guides (X alignment)
-      if (Math.abs(ncx - ocx) < SNAP_THRESHOLD) found.push({ type: 'v', pos: ocx })
-      if (Math.abs(nl  - ol)  < SNAP_THRESHOLD) found.push({ type: 'v', pos: ol })
-      if (Math.abs(nr  - or_) < SNAP_THRESHOLD) found.push({ type: 'v', pos: or_ })
-      if (Math.abs(nl  - or_) < SNAP_THRESHOLD) found.push({ type: 'v', pos: or_ })
-      if (Math.abs(nr  - ol)  < SNAP_THRESHOLD) found.push({ type: 'v', pos: ol })
-
-      // Horizontal guides (Y alignment)
-      if (Math.abs(ncy - ocy) < SNAP_THRESHOLD) found.push({ type: 'h', pos: ocy })
-      if (Math.abs(nt  - ot)  < SNAP_THRESHOLD) found.push({ type: 'h', pos: ot })
-      if (Math.abs(nb  - ob)  < SNAP_THRESHOLD) found.push({ type: 'h', pos: ob })
-      if (Math.abs(nt  - ob)  < SNAP_THRESHOLD) found.push({ type: 'h', pos: ob })
-      if (Math.abs(nb  - ot)  < SNAP_THRESHOLD) found.push({ type: 'h', pos: ot })
-    }
-
-    // Deduplicate guides at the same position
-    setGuides(found.filter((g, i, arr) =>
-      arr.findIndex(o => o.type === g.type && Math.abs(o.pos - g.pos) < 1) === i
-    ))
-  }, [])
-
-  const onNodeDragStop = useCallback((_e: React.MouseEvent, node: Node) => {
-    const nw = node.width ?? 0, nh = node.height ?? 0
-    const nl = node.position.x, nr = nl + nw, ncx = nl + nw / 2
-    const nt = node.position.y, nb = nt + nh, ncy = nt + nh / 2
-    let snapX: number | null = null, snapY: number | null = null
-
-    for (const other of nodesRef.current) {
-      if (other.id === node.id) continue
-      const ow = other.width ?? 0, oh = other.height ?? 0
-      const ol = other.position.x, or_ = ol + ow, ocx = ol + ow / 2
-      const ot = other.position.y, ob = ot + oh, ocy = ot + oh / 2
-
-      if (snapX === null) {
-        if (Math.abs(ncx - ocx) < SNAP_THRESHOLD) snapX = ocx - nw / 2
-        else if (Math.abs(nl - ol)  < SNAP_THRESHOLD) snapX = ol
-        else if (Math.abs(nr - or_) < SNAP_THRESHOLD) snapX = or_ - nw
-        else if (Math.abs(nl - or_) < SNAP_THRESHOLD) snapX = or_
-        else if (Math.abs(nr - ol)  < SNAP_THRESHOLD) snapX = ol - nw
+      // Drag ended — clear guides
+      if (!change.dragging) {
+        if (lastGuidesKey.current !== '') { lastGuidesKey.current = ''; setGuides([]) }
+        return change
       }
-      if (snapY === null) {
-        if (Math.abs(ncy - ocy) < SNAP_THRESHOLD) snapY = ocy - nh / 2
-        else if (Math.abs(nt - ot)  < SNAP_THRESHOLD) snapY = ot
-        else if (Math.abs(nb - ob)  < SNAP_THRESHOLD) snapY = ob - nh
-        else if (Math.abs(nt - ob)  < SNAP_THRESHOLD) snapY = ob
-        else if (Math.abs(nb - ot)  < SNAP_THRESHOLD) snapY = ot - nh
-      }
-      if (snapX !== null && snapY !== null) break
-    }
 
-    if (snapX !== null || snapY !== null) {
-      setNodes(ns => ns.map(n =>
-        n.id !== node.id ? n : { ...n, position: { x: snapX ?? n.position.x, y: snapY ?? n.position.y } }
-      ))
-    }
-    setGuides([])
-  }, [setNodes])
+      const node = nodesRef.current.find(n => n.id === change.id)
+      if (!node) return change
+
+      const nw = node.width ?? 0, nh = node.height ?? 0
+      const pos = change.position
+      const nl = pos.x, nr = nl + nw, ncx = nl + nw / 2
+      const nt = pos.y, nb = nt + nh, ncy = nt + nh / 2
+
+      let snapX: number | null = null, snapY: number | null = null
+      const newGuides: Guide[] = []
+
+      for (const other of nodesRef.current) {
+        if (other.id === change.id) continue
+        const ow = other.width ?? 0, oh = other.height ?? 0
+        const ol = other.position.x, or_ = ol + ow, ocx = ol + ow / 2
+        const ot = other.position.y, ob = ot + oh, ocy = ot + oh / 2
+
+        if (snapX === null) {
+          if      (Math.abs(ncx - ocx) < SNAP_T) { snapX = ocx - nw / 2; newGuides.push({ type: 'v', pos: ocx }) }
+          else if (Math.abs(nl  - ol)  < SNAP_T) { snapX = ol;            newGuides.push({ type: 'v', pos: ol }) }
+          else if (Math.abs(nr  - or_) < SNAP_T) { snapX = or_ - nw;      newGuides.push({ type: 'v', pos: or_ }) }
+          else if (Math.abs(nl  - or_) < SNAP_T) { snapX = or_;           newGuides.push({ type: 'v', pos: or_ }) }
+          else if (Math.abs(nr  - ol)  < SNAP_T) { snapX = ol - nw;       newGuides.push({ type: 'v', pos: ol }) }
+        }
+        if (snapY === null) {
+          if      (Math.abs(ncy - ocy) < SNAP_T) { snapY = ocy - nh / 2; newGuides.push({ type: 'h', pos: ocy }) }
+          else if (Math.abs(nt  - ot)  < SNAP_T) { snapY = ot;            newGuides.push({ type: 'h', pos: ot }) }
+          else if (Math.abs(nb  - ob)  < SNAP_T) { snapY = ob - nh;       newGuides.push({ type: 'h', pos: ob }) }
+          else if (Math.abs(nt  - ob)  < SNAP_T) { snapY = ob;            newGuides.push({ type: 'h', pos: ob }) }
+          else if (Math.abs(nb  - ot)  < SNAP_T) { snapY = ot - nh;       newGuides.push({ type: 'h', pos: ot }) }
+        }
+        if (snapX !== null && snapY !== null) break
+      }
+
+      // Only call setGuides when guides actually changed (avoids needless re-renders)
+      const key = newGuides.map(g => `${g.type}${g.pos}`).join(',')
+      if (key !== lastGuidesKey.current) { lastGuidesKey.current = key; setGuides(newGuides) }
+
+      if (snapX === null && snapY === null) return change
+      return { ...change, position: { x: snapX ?? pos.x, y: snapY ?? pos.y } }
+    })
+
+    applyNodesChanges(modified as NodeChange[])
+  }, [applyNodesChanges])
 
   const onNodeContextMenu = useCallback((e: React.MouseEvent, node: Node) => {
     e.preventDefault()
@@ -446,8 +432,6 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onNodeDrag={onNodeDrag}
-        onNodeDragStop={onNodeDragStop}
         onNodeContextMenu={onNodeContextMenu}
         onPaneClick={onPaneClick}
         onDragOver={onDragOver}
