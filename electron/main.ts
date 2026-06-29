@@ -1,14 +1,16 @@
-import { app, BrowserWindow, ipcMain, protocol, dialog, shell, nativeImage, Menu, net } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell, nativeImage, Menu, net } from 'electron'
 import { join } from 'path'
-import { pathToFileURL } from 'url'
+import { createServer, type Server } from 'http'
+import type { AddressInfo } from 'net'
 import {
   readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync,
-  unlinkSync, createWriteStream,
+  unlinkSync, createWriteStream, renameSync, statSync, createReadStream,
 } from 'fs'
 import { createHash } from 'crypto'
 import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { homedir } from 'os'
+import { pathToFileURL } from 'url'
 import { v4 as uuidv4 } from 'uuid'
 import electronUpdater from 'electron-updater'
 
@@ -124,6 +126,103 @@ function getNodeType(mime: string): string {
 // ─── State ────────────────────────────────────────────────────────────────────
 let mainWindow: BrowserWindow | null = null
 let vaultPath: string | null = null
+let mediaServerPort = 0
+let mediaServer: Server | null = null
+
+function startMediaServer(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    mediaServer = createServer((req, res) => {
+      if (!vaultPath) {
+        res.writeHead(404, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' })
+        res.end('No vault')
+        return
+      }
+
+      try {
+        const url  = new URL(req.url!, 'http://localhost')
+        const rel  = decodeURIComponent(url.pathname.slice(1))
+        const abs  = join(vaultPath, rel)
+
+        if (!abs.startsWith(vaultPath))   {
+          res.writeHead(403, { 'Access-Control-Allow-Origin': '*' })
+          res.end()
+          return
+        }
+        if (!existsSync(abs)) {
+          res.writeHead(404, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' })
+          res.end('Not found')
+          return
+        }
+
+        const stat  = statSync(abs)
+        if (stat.isDirectory()) {
+          res.writeHead(400, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' })
+          res.end('Not a file')
+          return
+        }
+        const total = stat.size
+        const mime  = getMime((abs.split('.').pop() ?? '').toLowerCase())
+        const cors  = {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Expose-Headers': 'Content-Range, Accept-Ranges, Content-Length',
+        }
+
+        function pipeWithErrorHandler(stream: ReturnType<typeof createReadStream>) {
+          stream.on('error', (err: NodeJS.ErrnoException) => {
+            process.stderr.write(`[media-server] stream error: ${err.message}\n`)
+            if (!res.headersSent) {
+              res.writeHead(500, { 'Access-Control-Allow-Origin': '*' })
+              res.end('Stream error')
+            } else {
+              res.destroy()
+            }
+          })
+          stream.pipe(res)
+        }
+
+        const rangeHeader = req.headers.range
+        if (rangeHeader) {
+          const [, s = '0', e = ''] = rangeHeader.match(/bytes=(\d*)-(\d*)/) ?? []
+          const start     = parseInt(s, 10) || 0
+          const end       = e ? parseInt(e, 10) : total - 1
+          const chunkSize = end - start + 1
+          res.writeHead(206, {
+            ...cors,
+            'Content-Range':  `bytes ${start}-${end}/${total}`,
+            'Content-Length': chunkSize,
+            'Content-Type':   mime,
+            'Accept-Ranges':  'bytes',
+          })
+          pipeWithErrorHandler(createReadStream(abs, { start, end }))
+        } else {
+          res.writeHead(200, {
+            ...cors,
+            'Content-Length': total,
+            'Content-Type':   mime,
+            'Accept-Ranges':  'bytes',
+          })
+          pipeWithErrorHandler(createReadStream(abs))
+        }
+      } catch (err) {
+        process.stderr.write(`[media-server] handler error: ${err}\n`)
+        if (!res.headersSent) {
+          res.writeHead(500, { 'Access-Control-Allow-Origin': '*' })
+          res.end('Error')
+        }
+      }
+    })
+
+    mediaServer.on('error', (err) => {
+      process.stderr.write(`[media-server] listen error: ${err.message}\n`)
+      resolve()  // don't block app startup on server failure
+    })
+    mediaServer.listen(0, '127.0.0.1', () => {
+      mediaServerPort = (mediaServer!.address() as AddressInfo).port
+      process.stdout.write(`[media-server] listening on port ${mediaServerPort}\n`)
+      resolve()
+    })
+  })
+}
 
 // ─── Prefs ────────────────────────────────────────────────────────────────────
 interface Prefs {
@@ -198,10 +297,26 @@ function saveBoardIndex(idx: BoardIndex): void {
 
 // ─── File import ──────────────────────────────────────────────────────────────
 interface ImportResult {
-  relativePath: string; fileName: string; mimeType: string; fileSize: number; nodeType: string; content?: string
+  relativePath: string; fileName: string; mimeType: string; fileSize: number;
+  nodeType: string; content?: string; thumbnailRelPath?: string
 }
 
-function importFileToVault(sourcePath: string): ImportResult {
+// Generate a first-frame thumbnail using macOS qlmanage (Quick Look, always available).
+// Returns the relative path within the vault, or null on failure.
+async function generateVideoThumbnail(videoAbsPath: string, thumbAbsPath: string): Promise<boolean> {
+  if (existsSync(thumbAbsPath)) return true
+  const dir  = thumbAbsPath.split('/').slice(0, -1).join('/')
+  const base = videoAbsPath.split('/').pop()!
+  try {
+    await execFileAsync('qlmanage', ['-t', '-s', '600', '-o', dir, videoAbsPath], { timeout: 8000 })
+    // qlmanage outputs: <dir>/<original-filename>.png
+    const qlOut = join(dir, base + '.png')
+    if (existsSync(qlOut)) { renameSync(qlOut, thumbAbsPath); return true }
+  } catch { /* qlmanage failed or timed out */ }
+  return false
+}
+
+async function importFileToVault(sourcePath: string): Promise<ImportResult> {
   if (!vaultPath) throw new Error('No vault open')
   if (!existsSync(sourcePath)) throw new Error('File not found')
 
@@ -227,6 +342,13 @@ function importFileToVault(sourcePath: string): ImportResult {
 
   if (nodeType === 'text') {
     result.content = buffer.toString('utf-8').slice(0, 60000)
+  }
+
+  if (nodeType === 'video') {
+    const thumbStored = `${hash}_thumb.png`
+    const thumbAbs    = join(vaultPath, ATTACHMENTS_DIR, thumbStored)
+    const ok = await generateVideoThumbnail(dest, thumbAbs)
+    if (ok) result.thumbnailRelPath = `${ATTACHMENTS_DIR}/${thumbStored}`
   }
 
   return result
@@ -350,6 +472,11 @@ function createWindow(): void {
   })
 
   mainWindow.webContents.on('will-navigate', e => e.preventDefault())
+  mainWindow.webContents.on('console-message', (_e, _level, message) => {
+    if (message.includes('[VideoNode]') || message.includes('[preload]')) {
+      process.stdout.write(`[renderer] ${message}\n`)
+    }
+  })
 
   if (process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -366,21 +493,11 @@ app.on('second-instance', () => {
   if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.focus() }
 })
 
-app.whenReady().then(() => {
-  // Serve vault files via localfile:// protocol.
-  // Delegates to net.fetch('file://') so Electron handles Range requests
-  // natively — required for video seeking and streaming.
-  protocol.handle('localfile', req => {
-    try {
-      const rel = decodeURIComponent(req.url.replace('localfile://', ''))
-      if (!vaultPath) return new Response('No vault', { status: 404 })
-      const abs = join(vaultPath, rel)
-      if (!existsSync(abs)) return new Response('Not found', { status: 404 })
-      return net.fetch(pathToFileURL(abs).href, { headers: req.headers })
-    } catch {
-      return new Response('Error', { status: 500 })
-    }
-  })
+app.whenReady().then(async () => {
+  await startMediaServer()
+
+  // IPC to expose the port synchronously to the preload
+  ipcMain.on('media-server-port', (event) => { event.returnValue = mediaServerPort })
 
   buildAppMenu()
   applyDockIcon(loadPrefs().iconStyle ?? 'Default')
@@ -423,6 +540,8 @@ ipcMain.handle('vault:open', (_e, path: string) => {
   savePrefs({ ...loadPrefs(), vaultPath: path })
   return { valid: true, vaultName: getVaultMeta(path).name }
 })
+
+ipcMain.handle('vault:get-path', () => vaultPath ?? '')
 
 // ─── IPC — Boards ─────────────────────────────────────────────────────────────
 ipcMain.handle('boards:list', () => {
@@ -503,7 +622,7 @@ ipcMain.handle('boards:set-last', (_e, id: string) => {
 })
 
 // ─── IPC — Files ──────────────────────────────────────────────────────────────
-ipcMain.handle('files:import', (_e, sourcePath: string) => {
+ipcMain.handle('files:import', async (_e, sourcePath: string) => {
   if (typeof sourcePath !== 'string' || sourcePath.includes('..')) throw new Error('Invalid path')
   return importFileToVault(sourcePath)
 })
@@ -511,6 +630,11 @@ ipcMain.handle('files:import', (_e, sourcePath: string) => {
 ipcMain.handle('files:open-external', (_e, relativePath: string) => {
   if (!vaultPath || typeof relativePath !== 'string') throw new Error('Invalid')
   return shell.openPath(join(vaultPath, relativePath))
+})
+
+ipcMain.handle('files:show-in-finder', (_e, relativePath: string) => {
+  if (!vaultPath || typeof relativePath !== 'string') throw new Error('Invalid')
+  shell.showItemInFolder(join(vaultPath, relativePath))
 })
 
 // ─── IPC — App ────────────────────────────────────────────────────────────────

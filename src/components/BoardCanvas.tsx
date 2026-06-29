@@ -3,7 +3,7 @@ import {
   ReactFlow, ReactFlowProvider, Background, BackgroundVariant,
   MiniMap, useNodesState, useEdgesState, useReactFlow, useViewport,
   addEdge,
-  type Node, type Edge, type Connection, type NodeChange,
+  type Node, type Edge, type Connection, type NodeChange, type EdgeChange,
 } from '@xyflow/react'
 import type {
   SerializedBoard, SerializedNode, SerializedEdge,
@@ -115,6 +115,12 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
   const [guides, setGuides]           = useState<Guide[]>([])
   const wrapperRef = useRef<HTMLDivElement>(null)
 
+  // ─── Undo / Redo history ─────────────────────────────────────────────────────
+  const historyRef     = useRef<Array<{ nodes: Node[]; edges: Edge[] }>>([])
+  const historyIdxRef  = useRef(-1)
+  const suppressHistory = useRef(false)
+  const pendingSnapshot = useRef(false)
+
   // Stable refs for the auto-save closure
   const boardMetaRef = useRef<{ id: string; name: string; createdAt: string }>({ id: boardId, name: '', createdAt: '' })
   const nodesRef     = useRef(nodes);        nodesRef.current     = nodes
@@ -127,6 +133,8 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
     setIsLoading(true)
     setContextMenu(null)
     setStylePanelId(null)
+    historyRef.current = []
+    historyIdxRef.current = -1
     window.canvas.boards.load(boardId).then(b => {
       boardMetaRef.current = { id: b.id, name: b.name, createdAt: b.createdAt }
       setNodes(b.nodes.map(toRFNode))
@@ -165,9 +173,29 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
     onMetaChange(boardId, nodes.length)
   }, [nodes, edges, background, isLoading])
 
+  // Record initial snapshot when board finishes loading
+  useEffect(() => {
+    if (!isLoading) {
+      historyRef.current = [{ nodes: [...nodesRef.current], edges: [...edgesRef.current] }]
+      historyIdxRef.current = 0
+    }
+  }, [isLoading])
+
+  // Commit pending snapshot after state update settles
+  useEffect(() => {
+    if (!pendingSnapshot.current || suppressHistory.current || isLoading) return
+    pendingSnapshot.current = false
+    const entry = { nodes: [...nodesRef.current], edges: [...edgesRef.current] }
+    historyRef.current = historyRef.current.slice(0, historyIdxRef.current + 1)
+    historyRef.current.push(entry)
+    if (historyRef.current.length > 80) historyRef.current.shift()
+    else historyIdxRef.current++
+  }, [nodes, edges, isLoading])
+
   // ─── Connections ─────────────────────────────────────────────────────────────
   const onConnect = useCallback((params: Connection) => {
     setEdges(es => addEdge(params, es))
+    pendingSnapshot.current = true
   }, [])
 
   const onPaneClick = useCallback(() => { setContextMenu(null); setStylePanelId(null) }, [])
@@ -176,7 +204,17 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
   const SNAP_T = 8
   const lastGuidesKey = useRef('')
 
+  const wrappedOnEdgesChange = useCallback((changes: EdgeChange[]) => {
+    if (!suppressHistory.current && changes.some(c => c.type === 'remove')) {
+      pendingSnapshot.current = true
+    }
+    onEdgesChange(changes)
+  }, [onEdgesChange])
+
   const onNodesChange = useCallback((changes: NodeChange[]) => {
+    if (!suppressHistory.current && changes.some(c => c.type === 'remove')) {
+      pendingSnapshot.current = true
+    }
     const modified = changes.map(change => {
       if (change.type !== 'position' || !change.position) return change
 
@@ -231,15 +269,27 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
     applyNodesChanges(modified as NodeChange[])
   }, [applyNodesChanges])
 
+  const onNodeDragStop = useCallback(() => {
+    if (!suppressHistory.current) pendingSnapshot.current = true
+  }, [])
+
   const onNodeContextMenu = useCallback((e: React.MouseEvent, node: Node) => {
     e.preventDefault()
-    setContextMenu({ nodeId: node.id, x: e.clientX, y: e.clientY })
+    const data = node.data as any
+    setContextMenu({
+      nodeId: node.id,
+      x: e.clientX,
+      y: e.clientY,
+      nodeType: node.type,
+      filePath: data.filePath as string | undefined,
+    })
   }, [])
 
   // ─── Context menu actions ────────────────────────────────────────────────────
   const handleDelete = useCallback((id: string) => {
     setNodes(ns => ns.filter(n => n.id !== id))
     setEdges(es => es.filter(e => e.source !== id && e.target !== id))
+    pendingSnapshot.current = true
   }, [])
 
   const handleDuplicate = useCallback((id: string) => {
@@ -248,6 +298,7 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
       if (!node) return ns
       return [...ns, { ...node, id: crypto.randomUUID(), position: { x: node.position.x + 30, y: node.position.y + 30 }, selected: false, data: { ...node.data } }]
     })
+    pendingSnapshot.current = true
   }, [])
 
   const handleBringToFront = useCallback((id: string) => {
@@ -266,22 +317,88 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
       if (noteColor !== undefined) (d as any).noteColor = noteColor
       return { ...n, data: d }
     }))
+    pendingSnapshot.current = true
+  }, [])
+
+  // ─── Undo / Redo ─────────────────────────────────────────────────────────────
+  const undo = useCallback(() => {
+    if (historyIdxRef.current <= 0) return
+    historyIdxRef.current--
+    const { nodes: n, edges: e } = historyRef.current[historyIdxRef.current]
+    suppressHistory.current = true
+    setNodes(n)
+    setEdges(e)
+    suppressHistory.current = false
+  }, [setNodes, setEdges])
+
+  const redo = useCallback(() => {
+    if (historyIdxRef.current >= historyRef.current.length - 1) return
+    historyIdxRef.current++
+    const { nodes: n, edges: e } = historyRef.current[historyIdxRef.current]
+    suppressHistory.current = true
+    setNodes(n)
+    setEdges(e)
+    suppressHistory.current = false
+  }, [setNodes, setEdges])
+
+  // ─── Copy / Paste / Show in Finder ──────────────────────────────────────────
+  const handleCopyNode = useCallback((id: string) => {
+    const node = nodesRef.current.find(n => n.id === id)
+    if (!node) return
+    canvasClipboard = { nodes: [node], edges: [] }
+  }, [])
+
+  const doPaste = useCallback(() => {
+    if (!canvasClipboard?.nodes.length) return
+    const idMap = new Map<string, string>()
+    canvasClipboard.nodes.forEach(n => idMap.set(n.id, crypto.randomUUID()))
+    const center = screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
+    const xs = canvasClipboard.nodes.map(n => n.position.x)
+    const ys = canvasClipboard.nodes.map(n => n.position.y)
+    const ox = (Math.min(...xs) + Math.max(...xs)) / 2
+    const oy = (Math.min(...ys) + Math.max(...ys)) / 2
+    const newNodes = canvasClipboard.nodes.map(n => ({
+      ...n,
+      id: idMap.get(n.id)!,
+      position: { x: center.x + (n.position.x - ox), y: center.y + (n.position.y - oy) },
+      selected: true,
+      data: { ...n.data },
+    }))
+    const newEdges = canvasClipboard.edges.map(ed => ({
+      ...ed,
+      id: crypto.randomUUID(),
+      source: idMap.get(ed.source)!,
+      target: idMap.get(ed.target)!,
+    }))
+    setNodes(ns => [...ns.map(n => ({ ...n, selected: false })), ...newNodes])
+    if (newEdges.length) setEdges(es => [...es, ...newEdges])
+    pendingSnapshot.current = true
+  }, [screenToFlowPosition, setNodes, setEdges])
+
+  const handleShowInFinder = useCallback((id: string) => {
+    const node = nodesRef.current.find(n => n.id === id)
+    if (!node) return
+    const filePath = (node.data as any).filePath as string | undefined
+    if (filePath) window.canvas.files.showInFinder(filePath)
   }, [])
 
   // ─── Add nodes from toolbar ──────────────────────────────────────────────────
   const addTitle = useCallback(() => {
     const pos = screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
     setNodes(ns => [...ns, { id: crypto.randomUUID(), type: 'title', position: { x: pos.x - 200, y: pos.y - 40 }, data: { content: '', fontSize: 32 }, width: 400, height: 80 }])
+    pendingSnapshot.current = true
   }, [screenToFlowPosition])
 
   const addNote = useCallback(() => {
     const pos = screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
     setNodes(ns => [...ns, { id: crypto.randomUUID(), type: 'note', position: pos, data: { content: '', noteColor: '#E8B547' }, width: 220, height: 180 }])
+    pendingSnapshot.current = true
   }, [screenToFlowPosition])
 
   const addText = useCallback(() => {
     const pos = screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
     setNodes(ns => [...ns, { id: crypto.randomUUID(), type: 'text', position: pos, data: { content: '' }, width: 260, height: 180 }])
+    pendingSnapshot.current = true
   }, [screenToFlowPosition])
 
   // ─── Keyboard shortcuts ──────────────────────────────────────────────────────
@@ -289,6 +406,12 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
     function onKey(e: KeyboardEvent) {
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+
+      // Undo / Redo
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+        if (e.shiftKey) redo(); else undo()
+        return
+      }
 
       // Copy selected nodes + their edges
       if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
@@ -302,31 +425,9 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
         return
       }
 
-      // Paste — centered on current viewport, works across boards
+      // Paste
       if ((e.metaKey || e.ctrlKey) && e.key === 'v') {
-        if (!canvasClipboard?.nodes.length) return
-        const idMap = new Map<string, string>()
-        canvasClipboard.nodes.forEach(n => idMap.set(n.id, crypto.randomUUID()))
-        const center = screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
-        const xs = canvasClipboard.nodes.map(n => n.position.x)
-        const ys = canvasClipboard.nodes.map(n => n.position.y)
-        const ox = (Math.min(...xs) + Math.max(...xs)) / 2
-        const oy = (Math.min(...ys) + Math.max(...ys)) / 2
-        const newNodes = canvasClipboard.nodes.map(n => ({
-          ...n,
-          id: idMap.get(n.id)!,
-          position: { x: center.x + (n.position.x - ox), y: center.y + (n.position.y - oy) },
-          selected: true,
-          data: { ...n.data },
-        }))
-        const newEdges = canvasClipboard.edges.map(ed => ({
-          ...ed,
-          id: crypto.randomUUID(),
-          source: idMap.get(ed.source)!,
-          target: idMap.get(ed.target)!,
-        }))
-        setNodes(ns => [...ns.map(n => ({ ...n, selected: false })), ...newNodes])
-        if (newEdges.length) setEdges(es => [...es, ...newEdges])
+        doPaste()
         return
       }
 
@@ -342,7 +443,7 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [fitView, zoomIn, zoomOut, addTitle, screenToFlowPosition, setNodes, setEdges])
+  }, [fitView, zoomIn, zoomOut, addTitle, screenToFlowPosition, setNodes, setEdges, undo, redo, doPaste])
 
   // ─── Drag and drop ───────────────────────────────────────────────────────────
   const onDragOver = useCallback((e: React.DragEvent) => {
@@ -371,13 +472,16 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
           id: crypto.randomUUID(),
           type: imp.nodeType,
           position: { x: basePos.x + offsetX, y: basePos.y },
-          data: { filePath: imp.relativePath, fileName: imp.fileName, mimeType: imp.mimeType, fileSize: imp.fileSize, content: imp.content ?? '' } as AnyNodeData,
+          data: { filePath: imp.relativePath, fileName: imp.fileName, mimeType: imp.mimeType, fileSize: imp.fileSize, content: imp.content ?? '', thumbnailPath: imp.thumbnailRelPath } as AnyNodeData,
           width: w, height: h,
         })
         offsetX += w + 20
       } catch { /* skip */ }
     }
-    if (added.length) setNodes(ns => [...ns, ...added])
+    if (added.length) {
+      setNodes(ns => [...ns, ...added])
+      pendingSnapshot.current = true
+    }
   }, [screenToFlowPosition])
 
   // ─── Background variant ──────────────────────────────────────────────────────
@@ -430,8 +534,9 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
         nodeTypes={NODE_TYPES}
         edgeTypes={EDGE_TYPES}
         onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
+        onEdgesChange={wrappedOnEdgesChange}
         onConnect={onConnect}
+        onNodeDragStop={onNodeDragStop}
         onNodeContextMenu={onNodeContextMenu}
         onPaneClick={onPaneClick}
         onDragOver={onDragOver}
@@ -468,6 +573,9 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
           onBringToFront={handleBringToFront}
           onSendToBack={handleSendToBack}
           onOpenStyle={id => { setStylePanelId(id); setContextMenu(null) }}
+          onCopy={handleCopyNode}
+          onPaste={doPaste}
+          onShowInFinder={handleShowInFinder}
         />
       )}
 

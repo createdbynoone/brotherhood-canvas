@@ -1,11 +1,17 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+// Fetch the media server port synchronously at preload time.
+// The HTTP server is guaranteed to be up before createWindow() is called.
+const mediaPort: number = ipcRenderer.sendSync('media-server-port')
+console.log(`[preload] mediaPort=${mediaPort}`)
+
 contextBridge.exposeInMainWorld('canvas', {
   vault: {
     initFromPrefs:  ()                          => ipcRenderer.invoke('vault:init-from-prefs'),
     openDialog:     ()                          => ipcRenderer.invoke('vault:open-dialog'),
     create:         (path: string)              => ipcRenderer.invoke('vault:create', path),
     open:           (path: string)              => ipcRenderer.invoke('vault:open', path),
+    getPath:        ()                          => ipcRenderer.invoke('vault:get-path'),
   },
   boards: {
     list:           ()                          => ipcRenderer.invoke('boards:list'),
@@ -19,7 +25,13 @@ contextBridge.exposeInMainWorld('canvas', {
   files: {
     import:         (path: string)              => ipcRenderer.invoke('files:import', path),
     openExternal:   (rel: string)               => ipcRenderer.invoke('files:open-external', rel),
-    localUrl:       (rel: string)               => `localfile://${encodeURIComponent(rel)}`,
+    showInFinder:   (rel: string)               => ipcRenderer.invoke('files:show-in-finder', rel),
+    localUrl:       (rel: string)               => {
+      // Encode each path segment individually so filenames with spaces/special
+      // chars work, while keeping slashes as URL path separators.
+      const encoded = rel.split('/').map(encodeURIComponent).join('/')
+      return `http://127.0.0.1:${mediaPort}/${encoded}`
+    },
   },
   app: {
     getVersion:     ()                          => ipcRenderer.invoke('get-version'),

@@ -20,6 +20,7 @@ export default defineConfig({
     root: 'src',
     build: { rollupOptions: { input: resolve('src/index.html') } },
     plugins: [react()],
+    server: { port: process.env.RENDERER_PORT ? parseInt(process.env.RENDERER_PORT) : 5173 },
     optimizeDeps: {
       include: ['@xyflow/react'],
     },

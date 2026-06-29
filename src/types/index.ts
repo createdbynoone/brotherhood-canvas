@@ -19,6 +19,7 @@ export interface MediaNodeData extends BaseNodeData {
   fileName: string
   mimeType: string
   fileSize: number
+  thumbnailPath?: string  // pre-generated thumbnail (video first-frame via qlmanage)
 }
 
 export interface TextNodeData extends BaseNodeData {
@@ -86,6 +87,7 @@ export interface ImportResult {
   fileSize: number
   nodeType: string
   content?: string
+  thumbnailRelPath?: string  // set for video nodes
 }
 
 // ─── Update ───────────────────────────────────────────────────────────────────
@@ -104,6 +106,7 @@ export interface CanvasAPI {
     openDialog(): Promise<string | null>
     create(path: string): Promise<{ vaultName: string }>
     open(path: string): Promise<{ valid: boolean; vaultName?: string }>
+    getPath(): Promise<string>
   }
   boards: {
     list(): Promise<BoardMeta[]>
@@ -117,6 +120,7 @@ export interface CanvasAPI {
   files: {
     import(path: string): Promise<ImportResult>
     openExternal(rel: string): Promise<void>
+    showInFinder(rel: string): Promise<void>
     localUrl(rel: string): string
   }
   app: {
@@ -132,6 +136,8 @@ export interface ContextMenuState {
   nodeId: string
   x: number
   y: number
+  nodeType?: string
+  filePath?: string
 }
 
 // ─── App vault state ──────────────────────────────────────────────────────────

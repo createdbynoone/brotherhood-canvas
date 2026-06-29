@@ -10,10 +10,14 @@ interface Props {
   onBringToFront: (id: string) => void
   onSendToBack: (id: string) => void
   onOpenStyle: (id: string) => void
+  onCopy: (id: string) => void
+  onPaste: () => void
+  onShowInFinder?: (id: string) => void
 }
 
 export default function ContextMenu({
-  menu, onClose, onDelete, onDuplicate, onEditLabel, onBringToFront, onSendToBack, onOpenStyle
+  menu, onClose, onDelete, onDuplicate, onEditLabel, onBringToFront, onSendToBack,
+  onOpenStyle, onCopy, onPaste, onShowInFinder,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -25,7 +29,6 @@ export default function ContextMenu({
     return () => document.removeEventListener('mousedown', handler)
   }, [onClose])
 
-  // Flip menu if too close to bottom/right
   const style: React.CSSProperties = {
     position: 'fixed',
     left: menu.x,
@@ -47,6 +50,8 @@ export default function ContextMenu({
     )
   }
 
+  const isMedia = menu.nodeType === 'image' || menu.nodeType === 'video'
+
   return (
     <div
       ref={ref}
@@ -56,9 +61,18 @@ export default function ContextMenu({
       {item('Edit Label', () => onEditLabel(menu.nodeId))}
       {item('Style', () => onOpenStyle(menu.nodeId))}
       <div className="border-t border-border/60 my-1" />
+      {item('Copy', () => onCopy(menu.nodeId))}
+      {item('Paste', () => onPaste())}
+      <div className="border-t border-border/60 my-1" />
       {item('Duplicate', () => onDuplicate(menu.nodeId))}
       {item('Bring to Front', () => onBringToFront(menu.nodeId))}
       {item('Send to Back', () => onSendToBack(menu.nodeId))}
+      {isMedia && onShowInFinder && (
+        <>
+          <div className="border-t border-border/60 my-1" />
+          {item('Show in Finder', () => onShowInFinder(menu.nodeId))}
+        </>
+      )}
       <div className="border-t border-border/60 my-1" />
       {item('Delete', () => onDelete(menu.nodeId), true)}
     </div>
