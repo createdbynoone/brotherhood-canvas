@@ -2,6 +2,7 @@ import { memo, useState, useRef, useEffect, useCallback } from 'react'
 import { useReactFlow, type NodeProps } from '@xyflow/react'
 import type { TextNodeData } from '../../types'
 import NodeShell from './NodeShell'
+import NoteContent from './NoteContent'
 
 function TextNode({ data, selected, width, height, id }: NodeProps & { data: TextNodeData; width?: number; height?: number }) {
   const { updateNodeData } = useReactFlow()
@@ -51,8 +52,10 @@ function TextNode({ data, selected, width, height, id }: NodeProps & { data: Tex
             spellCheck={false}
           />
         ) : (
-          <div className="w-full h-full px-3 py-2 text-[13.7px] text-text-primary font-heading leading-relaxed whitespace-pre-wrap overflow-hidden cursor-text">
-            {data.content || (
+          <div className="w-full h-full px-3 py-2 text-[13.7px] text-text-primary font-heading leading-relaxed overflow-hidden cursor-text">
+            {data.content ? (
+              <NoteContent content={data.content} />
+            ) : (
               <span className="text-text-muted italic text-[12.7px]">Double-click to edit…</span>
             )}
           </div>

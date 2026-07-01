@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 // Fetch the media server port synchronously at preload time.
 // The HTTP server is guaranteed to be up before createWindow() is called.
@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld('canvas', {
   },
   files: {
     import:         (path: string)              => ipcRenderer.invoke('files:import', path),
+    // Electron 32+ removed File.path from the renderer — this is the only way
+    // to resolve the absolute path of a dragged-in file
+    getPathForFile: (file: File)                => webUtils.getPathForFile(file),
     openExternal:   (rel: string)               => ipcRenderer.invoke('files:open-external', rel),
     showInFinder:   (rel: string)               => ipcRenderer.invoke('files:show-in-finder', rel),
     localUrl:       (rel: string)               => {

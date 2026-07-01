@@ -119,6 +119,7 @@ export interface CanvasAPI {
   }
   files: {
     import(path: string): Promise<ImportResult>
+    getPathForFile(file: File): string
     openExternal(rel: string): Promise<void>
     showInFinder(rel: string): Promise<void>
     localUrl(rel: string): string

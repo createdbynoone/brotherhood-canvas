@@ -492,7 +492,8 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
     const added: Node[] = []
     let offsetX = 0
     for (const file of files) {
-      const path = (file as any).path as string
+      let path = ''
+      try { path = window.canvas.files.getPathForFile(file) } catch { /* not a real file */ }
       if (!path) continue
       try {
         const imp = await window.canvas.files.import(path)

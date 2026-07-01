@@ -3,7 +3,7 @@
 Electron app para mind maps y moodboards dinámicos con archivos multimedia. Vault local tipo Obsidian.
 
 **GitHub:** `createdbynoone/brotherhood-canvas`
-**Versión actual:** `v1.1.0`
+**Versión actual:** `v1.1.1`
 
 ## Stack
 - Electron 43 + electron-vite 5 + React 18 + TypeScript + Tailwind CSS
