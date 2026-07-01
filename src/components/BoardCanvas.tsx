@@ -173,6 +173,12 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
     onMetaChange(boardId, nodes.length)
   }, [nodes, edges, background, isLoading])
 
+  // Persist viewport after pan/zoom gestures settle
+  const onMoveEnd = useCallback(() => {
+    if (!isLoadingRef.current) schedulesSave()
+  }, [schedulesSave])
+  const isLoadingRef = useRef(isLoading); isLoadingRef.current = isLoading
+
   // Record initial snapshot when board finishes loading
   useEffect(() => {
     if (!isLoading) {
@@ -431,6 +437,30 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
         return
       }
 
+      // Select all
+      if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+        e.preventDefault()
+        setNodes(ns => ns.map(n => ({ ...n, selected: true })))
+        return
+      }
+
+      // Duplicate selected
+      if ((e.metaKey || e.ctrlKey) && e.key === 'd') {
+        e.preventDefault()
+        const selected = nodesRef.current.filter(n => n.selected)
+        if (!selected.length) return
+        const dupes = selected.map(n => ({
+          ...n,
+          id: crypto.randomUUID(),
+          position: { x: n.position.x + 30, y: n.position.y + 30 },
+          selected: true,
+          data: { ...n.data },
+        }))
+        setNodes(ns => [...ns.map(n => ({ ...n, selected: false })), ...dupes])
+        pendingSnapshot.current = true
+        return
+      }
+
       if (!e.metaKey && !e.ctrlKey) {
         if (e.key === 'v' || e.key === 'V') setTool('select')
         if (e.key === 'h' || e.key === 'H') setTool('pan')
@@ -538,14 +568,20 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
         onNodeContextMenu={onNodeContextMenu}
+        onMoveEnd={onMoveEnd}
         onPaneClick={onPaneClick}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
         panOnDrag={tool === 'pan' ? true : [1, 2]}
         selectionOnDrag={tool === 'select'}
-        zoomOnScroll
+        panOnScroll
+        panOnScrollSpeed={1.4}
+        zoomOnScroll={false}
         zoomOnPinch
+        zoomActivationKeyCode="Meta"
+        minZoom={0.05}
+        maxZoom={4}
         deleteKeyCode={['Delete', 'Backspace']}
         multiSelectionKeyCode="Shift"
         defaultEdgeOptions={{ style: { stroke: '#3a3a3a', strokeWidth: 1.5 } }}
@@ -556,6 +592,8 @@ function BoardCanvasInner({ boardId, onMetaChange }: { boardId: string; onMetaCh
         {bgVariant && <Background variant={bgVariant} color="#1e1e1e" gap={20} size={1.5} />}
         <AlignmentGuides guides={guides} />
         <MiniMap
+          pannable
+          zoomable
           nodeColor="#2a2a2a"
           maskColor="rgba(12,12,12,0.65)"
           style={{ background: '#141414', border: '1px solid #242424', borderRadius: 8 }}

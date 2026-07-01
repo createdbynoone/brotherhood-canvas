@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 
 // Fetch the media server port synchronously at preload time.
 // The HTTP server is guaranteed to be up before createWindow() is called.
-const mediaPort: number = ipcRenderer.sendSync('media-server-port')
+const { port: mediaPort, token: mediaToken } = ipcRenderer.sendSync('media-server-info') as { port: number; token: string }
 console.log(`[preload] mediaPort=${mediaPort}`)
 
 contextBridge.exposeInMainWorld('canvas', {
@@ -30,7 +30,7 @@ contextBridge.exposeInMainWorld('canvas', {
       // Encode each path segment individually so filenames with spaces/special
       // chars work, while keeping slashes as URL path separators.
       const encoded = rel.split('/').map(encodeURIComponent).join('/')
-      return `http://127.0.0.1:${mediaPort}/${encoded}`
+      return `http://127.0.0.1:${mediaPort}/${encoded}?token=${mediaToken}`
     },
   },
   app: {

@@ -26,7 +26,7 @@ export default function NodeShell({
       <Handle type="source" position={Position.Bottom} id="bottom" />
       <Handle type="source" position={Position.Left}   id="left"   />
 
-      <div className={`absolute inset-0 overflow-hidden ${innerClassName}`} style={innerStyle}>
+      <div className={`nodeshell-inner absolute inset-0 overflow-hidden ${innerClassName}`} style={innerStyle}>
         {children}
       </div>
     </div>

@@ -3,10 +3,10 @@
 Electron app para mind maps y moodboards dinámicos con archivos multimedia. Vault local tipo Obsidian.
 
 **GitHub:** `createdbynoone/brotherhood-canvas`
-**Versión actual:** `v1.0.22`
+**Versión actual:** `v1.1.0`
 
 ## Stack
-- Electron 31 + electron-vite + React 18 + TypeScript + Tailwind CSS
+- Electron 43 + electron-vite 5 + React 18 + TypeScript + Tailwind CSS
 - **@xyflow/react** v12.3+ para el canvas
 - electron-updater para auto-update desde GitHub Releases
 - Preload compilado como **CJS** (`preload.cjs`)
@@ -55,9 +55,17 @@ El script: build ambas arquitecturas → crea GitHub release → sube todos los 
 
 ## HTTP Media Server
 - Node.js `http.createServer` en `127.0.0.1:0` (puerto aleatorio) para servir archivos del vault
+- **Auth por token**: token aleatorio por sesión (`randomBytes(32)`), requerido como `?token=` en cada request — sin él responde 403. Evita que webs locales lean el vault escaneando puertos
+- Path containment con `relative()` (no `startsWith`, bypasseable por carpetas hermanas)
 - Soporta Range requests (HTTP 206) para streaming de video
 - CSP en `src/index.html` incluye `http://127.0.0.1:*` en `img-src`, `media-src`, `connect-src`
-- Puerto expuesto al renderer vía `ipcRenderer.sendSync('media-server-port')` en el preload
+- Puerto + token expuestos al renderer vía `ipcRenderer.sendSync('media-server-info')` en el preload
+
+## Seguridad (v1.1.0)
+- IPC de boards valida ids con `safeBoardId()` (regex, bloquea traversal)
+- `files:open-external` / `show-in-finder` contenidos al vault con `vaultContainedPath()`
+- `setWindowOpenHandler` → deny; `will-navigate` → prevent
+- uuid reemplazado por `crypto.randomUUID()` (dep eliminada)
 
 ## IPC API (window.canvas)
 - `vault.*` — initFromPrefs, openDialog, create, open, getPath

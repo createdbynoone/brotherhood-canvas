@@ -29,23 +29,27 @@ export default function ContextMenu({
     return () => document.removeEventListener('mousedown', handler)
   }, [onClose])
 
+  const MENU_W = 176, MENU_H = 320
   const style: React.CSSProperties = {
     position: 'fixed',
-    left: menu.x,
-    top: menu.y,
+    left: Math.min(menu.x, window.innerWidth - MENU_W - 8),
+    top: Math.min(menu.y, window.innerHeight - MENU_H - 8),
     zIndex: 9999,
   }
 
-  function item(label: string, onClick: () => void, danger = false) {
+  function item(label: string, onClick: () => void, opts?: { danger?: boolean; shortcut?: string }) {
     return (
       <button
         key={label}
         onClick={() => { onClick(); onClose() }}
-        className={`w-full px-3 py-1.5 text-left text-[12.7px] transition-colors hover:bg-white/[0.05] ${
-          danger ? 'text-red-400 hover:bg-red-500/10' : 'text-text-secondary hover:text-text-primary'
+        className={`w-full px-3 py-1.5 flex items-center justify-between gap-4 text-left text-[12.7px] transition-colors hover:bg-white/[0.05] ${
+          opts?.danger ? 'text-red-400 hover:bg-red-500/10' : 'text-text-secondary hover:text-text-primary'
         }`}
       >
-        {label}
+        <span>{label}</span>
+        {opts?.shortcut && (
+          <span className="font-mono text-[10px] text-text-muted tracking-wider">{opts.shortcut}</span>
+        )}
       </button>
     )
   }
@@ -56,15 +60,15 @@ export default function ContextMenu({
     <div
       ref={ref}
       style={style}
-      className="bg-surface border border-border rounded-xl shadow-2xl py-1.5 min-w-[160px]"
+      className="animate-menu-in bg-surface/95 backdrop-blur-md border border-border rounded-xl shadow-2xl py-1.5 min-w-[176px]"
     >
       {item('Edit Label', () => onEditLabel(menu.nodeId))}
       {item('Style', () => onOpenStyle(menu.nodeId))}
       <div className="border-t border-border/60 my-1" />
-      {item('Copy', () => onCopy(menu.nodeId))}
-      {item('Paste', () => onPaste())}
+      {item('Copy', () => onCopy(menu.nodeId), { shortcut: '⌘C' })}
+      {item('Paste', () => onPaste(), { shortcut: '⌘V' })}
+      {item('Duplicate', () => onDuplicate(menu.nodeId), { shortcut: '⌘D' })}
       <div className="border-t border-border/60 my-1" />
-      {item('Duplicate', () => onDuplicate(menu.nodeId))}
       {item('Bring to Front', () => onBringToFront(menu.nodeId))}
       {item('Send to Back', () => onSendToBack(menu.nodeId))}
       {isMedia && onShowInFinder && (
@@ -74,7 +78,7 @@ export default function ContextMenu({
         </>
       )}
       <div className="border-t border-border/60 my-1" />
-      {item('Delete', () => onDelete(menu.nodeId), true)}
+      {item('Delete', () => onDelete(menu.nodeId), { danger: true, shortcut: '⌫' })}
     </div>
   )
 }

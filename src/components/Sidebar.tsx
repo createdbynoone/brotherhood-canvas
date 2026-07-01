@@ -15,6 +15,7 @@ interface ContextMenu { id: string; x: number; y: number }
 export default function Sidebar({ boards, activeBoardId, onSelect, onCreate, onDelete, onRename }: Props) {
   const [search, setSearch]         = useState('')
   const [ctxMenu, setCtxMenu]       = useState<ContextMenu | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameVal, setRenameVal]   = useState('')
   const renameRef = useRef<HTMLInputElement>(null)
@@ -27,6 +28,7 @@ export default function Sidebar({ boards, activeBoardId, onSelect, onCreate, onD
 
   function openCtxMenu(e: React.MouseEvent, id: string) {
     e.preventDefault(); e.stopPropagation()
+    setConfirmDelete(false)
     setCtxMenu({ id, x: e.clientX, y: e.clientY })
   }
 
@@ -53,11 +55,14 @@ export default function Sidebar({ boards, activeBoardId, onSelect, onCreate, onD
   return (
     <div
       className="w-56 h-full flex flex-col border-r border-border bg-surface flex-shrink-0"
-      onClick={() => setCtxMenu(null)}
+      onClick={() => { setCtxMenu(null); setConfirmDelete(false) }}
     >
       {/* Header */}
-      <div className="px-3 pt-3 pb-2 border-b border-border">
+      <div className="px-3 pt-3 pb-2 border-b border-border flex items-center justify-between">
         <span className="font-heading font-semibold text-[10.7px] uppercase tracking-widest text-text-muted">Boards</span>
+        {boards.length > 0 && (
+          <span className="font-mono text-[9.7px] text-text-muted tabular-nums">{boards.length}</span>
+        )}
       </div>
 
       {/* Search */}
@@ -88,10 +93,10 @@ export default function Sidebar({ boards, activeBoardId, onSelect, onCreate, onD
               key={board.id}
               onClick={() => onSelect(board.id)}
               onContextMenu={e => openCtxMenu(e, board.id)}
-              className={`group relative flex flex-col px-3 py-2 cursor-pointer transition-colors ${
+              className={`group relative flex flex-col mx-1.5 my-0.5 px-2.5 py-2 rounded-lg cursor-pointer transition-colors ${
                 board.id === activeBoardId
-                  ? 'bg-accent/10 border-l-2 border-accent'
-                  : 'hover:bg-white/[0.03] border-l-2 border-transparent'
+                  ? 'bg-accent/10 ring-1 ring-inset ring-accent/25'
+                  : 'hover:bg-white/[0.04]'
               }`}
             >
               {renamingId === board.id ? (
@@ -126,7 +131,7 @@ export default function Sidebar({ boards, activeBoardId, onSelect, onCreate, onD
       <div className="border-t border-border p-2">
         <button
           onClick={onCreate}
-          className="no-drag w-full flex items-center justify-center gap-1.5 py-2 rounded-lg font-heading font-semibold text-[11.7px] uppercase tracking-widest text-text-muted hover:text-text-primary hover:bg-white/[0.04] transition-colors"
+          className="no-drag w-full flex items-center justify-center gap-1.5 py-2 rounded-lg font-heading font-semibold text-[11.7px] uppercase tracking-widest text-text-muted hover:text-text-primary hover:bg-white/[0.04] active:scale-[0.98] transition-all"
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 5v14M5 12h14" />
@@ -138,7 +143,7 @@ export default function Sidebar({ boards, activeBoardId, onSelect, onCreate, onD
       {/* Context menu */}
       {ctxMenu && (
         <div
-          className="fixed z-50 bg-surface border border-border rounded-lg shadow-xl py-1 min-w-[140px]"
+          className="animate-menu-in fixed z-50 bg-surface/95 backdrop-blur-md border border-border rounded-lg shadow-xl py-1 min-w-[140px]"
           style={{ left: ctxMenu.x, top: ctxMenu.y }}
           onClick={e => e.stopPropagation()}
         >
@@ -150,10 +155,17 @@ export default function Sidebar({ boards, activeBoardId, onSelect, onCreate, onD
           </button>
           <div className="border-t border-border my-1" />
           <button
-            onClick={() => { onDelete(ctxMenu.id); setCtxMenu(null) }}
-            className="w-full px-3 py-1.5 text-left text-[12.7px] text-red-400 hover:bg-red-500/10 transition-colors"
+            onClick={() => {
+              if (!confirmDelete) { setConfirmDelete(true); return }
+              onDelete(ctxMenu.id); setCtxMenu(null); setConfirmDelete(false)
+            }}
+            className={`w-full px-3 py-1.5 text-left text-[12.7px] transition-colors ${
+              confirmDelete
+                ? 'text-red-300 bg-red-500/15 hover:bg-red-500/25 font-medium'
+                : 'text-red-400 hover:bg-red-500/10'
+            }`}
           >
-            Delete Board
+            {confirmDelete ? 'Confirm delete?' : 'Delete Board'}
           </button>
         </div>
       )}

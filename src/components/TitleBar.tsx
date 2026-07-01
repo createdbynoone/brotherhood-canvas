@@ -6,10 +6,10 @@ interface Props {
 export default function TitleBar({ vaultName, boardName }: Props) {
   return (
     <div
-      className="drag-region h-10 flex items-center border-b border-border flex-shrink-0"
-      style={{ paddingLeft: 80, paddingRight: 16 }}
+      className="drag-region h-11 flex items-center border-b border-border flex-shrink-0"
+      style={{ paddingLeft: 92, paddingRight: 16 }}
     >
-      <div className="flex items-center gap-2 min-w-0 flex-1">
+      <div className="flex items-center gap-2 min-w-0 flex-1 translate-y-[1px]">
         <span className="font-heading font-semibold text-[12px] text-text-muted uppercase tracking-widest">
           {vaultName}
         </span>
@@ -20,7 +20,7 @@ export default function TitleBar({ vaultName, boardName }: Props) {
           </>
         )}
       </div>
-      <span className="font-mono text-[10.7px] text-text-muted tracking-widest uppercase">brotherhood.com.co</span>
+      <span className="font-mono text-[10.7px] text-text-muted tracking-widest uppercase inline-block translate-y-[1px]">brotherhood.com.co</span>
     </div>
   )
 }

@@ -51,13 +51,23 @@ export default function StylePanel({ nodeId, initialStyle, nodeType, nodeLabel, 
 
   return (
     <div
-      className="absolute right-3 top-3 z-40 w-52 bg-surface border border-border rounded-xl shadow-2xl overflow-hidden"
+      className="animate-panel-in absolute right-3 top-3 z-40 w-52 bg-surface/95 backdrop-blur-md border border-border rounded-xl shadow-2xl overflow-hidden"
       onMouseDown={e => e.stopPropagation()}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <span className="text-[11.7px] font-semibold text-text-secondary uppercase tracking-wider">Style</span>
-        <button onClick={onClose} className="text-text-muted hover:text-text-secondary transition-colors text-xs">✕</button>
+        <div className="flex items-baseline gap-1.5">
+          <span className="font-heading text-[11.7px] font-semibold text-text-secondary uppercase tracking-wider">Style</span>
+          {nodeType && (
+            <span className="font-mono text-[9.7px] text-accent/70 uppercase tracking-widest">{nodeType}</span>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="w-5 h-5 rounded-md flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/[0.06] transition-colors text-xs"
+        >
+          ✕
+        </button>
       </div>
 
       <div className="p-3 flex flex-col gap-3">

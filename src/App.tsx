@@ -6,6 +6,7 @@ import BoardCanvas from './components/BoardCanvas'
 import TitleBar from './components/TitleBar'
 import UpdateBar from './components/UpdateBar'
 import MediaLightbox, { type LightboxState } from './components/MediaLightbox'
+import SettingsPanel from './components/SettingsPanel'
 
 export default function App() {
   const [screen, setScreen]     = useState<AppScreen>('loading')
@@ -114,6 +115,7 @@ export default function App() {
           onRename={onRenameBoard}
         />
         <div className="flex-1 relative overflow-hidden">
+          <SettingsPanel />
           {activeBoardId ? (
             <BoardCanvas
               key={activeBoardId}
@@ -121,16 +123,21 @@ export default function App() {
               onMetaChange={onBoardMetaChange}
             />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-text-secondary">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <line x1="9" y1="3" x2="9" y2="21" />
-                <line x1="15" y1="3" x2="15" y2="21" />
-              </svg>
-              <p className="text-[13.7px]">Create a board to get started</p>
+            <div className="animate-fade-in w-full h-full flex flex-col items-center justify-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-accent/[0.06] border border-accent/15 flex items-center justify-center">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E8B547" strokeWidth="1.5" opacity="0.8">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="9" y1="3" x2="9" y2="21" />
+                  <line x1="15" y1="3" x2="15" y2="21" />
+                </svg>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <p className="font-heading font-semibold text-[14.7px] text-text-primary">No boards yet</p>
+                <p className="text-[12.7px] text-text-secondary">Create your first board to start building</p>
+              </div>
               <button
                 onClick={onCreateBoard}
-                className="no-drag mt-1 px-4 py-1.5 bg-accent text-bg rounded-md text-[12.7px] font-medium hover:bg-accent/90 transition-colors"
+                className="no-drag mt-1 px-5 py-2 bg-accent text-bg rounded-lg font-heading font-semibold text-[12px] uppercase tracking-widest hover:bg-accent/90 active:scale-[0.98] transition-all"
               >
                 New Board
               </button>

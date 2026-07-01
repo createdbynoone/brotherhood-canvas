@@ -148,3 +148,43 @@ html, body, #root {
 /* ─── Utilities ─────────────────────────────────────────────────────────────── */
 .drag-region { -webkit-app-region: drag; }
 .no-drag { -webkit-app-region: no-drag; }
+
+/* ─── Entry animations ──────────────────────────────────────────────────────── */
+@keyframes menu-in {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-menu-in {
+  animation: menu-in 0.13s cubic-bezier(0.2, 0, 0.2, 1);
+  transform-origin: top left;
+}
+
+@keyframes panel-in {
+  from { opacity: 0; transform: translateX(10px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.animate-panel-in {
+  animation: panel-in 0.18s cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* ─── Node depth: hover + selection ─────────────────────────────────────────── */
+.nodeshell-inner {
+  transition: box-shadow 0.15s ease;
+}
+.react-flow__node:hover .nodeshell-inner {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.react-flow__node.selected .nodeshell-inner {
+  box-shadow:
+    0 0 0 1.5px rgba(232, 181, 71, 0.35),
+    0 0 24px rgba(232, 181, 71, 0.08),
+    0 10px 32px rgba(0, 0, 0, 0.45);
+}
